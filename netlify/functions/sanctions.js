@@ -122,7 +122,46 @@ export default async (req) => {
     }
 
 
-    const params = snapshotId ? { p_snapshot_id: snapshotId } : {};
+    // Skapa jobbrekord
+    if (action === "create-job") {
+      const body = await req.json();
+      const src = body.source || "ALL";
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/update_job`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_ANON_KEY,
+          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=representation",
+        },
+        body: JSON.stringify({ source: src, status: "running", message: "Starting..." }),
+      });
+      if (!res.ok) throw new Error("Could not create job: " + await res.text());
+      const rows = await res.json();
+      return new Response(JSON.stringify({ jobId: rows[0].id }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+
+    if (action === "job-status") {
+      const jobId = url.searchParams.get("job_id");
+      if (!jobId) return new Response(JSON.stringify({ error: "Missing job_id" }), { status: 400, headers: { "Content-Type": "application/json" } });
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/update_job?select=*&id=eq.${jobId}`,
+        { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      if (!res.ok) throw new Error("Could not fetch job status");
+      const rows = await res.json();
+      const job = rows[0] || null;
+      return new Response(JSON.stringify({ job }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
+      });
+    }
+
+
     const rows = await rpc("get_sanctions_entries", params);
 
     const entries = rows.map(r => ({

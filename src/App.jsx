@@ -248,23 +248,60 @@ function ListManagement() {
 
   const triggerUpdate = async (source) => {
     setUpdateStatus("running");
-    setUpdateMsg("Update started — this runs in the background and may take a few minutes...");
+    setUpdateMsg("Starting update job...");
     try {
-      const res = await fetch("/.netlify/functions/update-sanctions", {
+      // Create job record in Supabase first
+      const jobRes = await fetch(
+        `${process.env.REACT_APP_SUPABASE_URL || ""}`, // fallback via sanctions function
+      );
+
+      // Create job via sanctions function proxy
+      const createRes = await fetch("/.netlify/functions/sanctions?action=create-job", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source }),
       });
-      if (res.status === 202 || res.status === 204) {
-        setUpdateStatus("done");
-        setUpdateMsg("Update job started successfully. Refresh the page in a few minutes to see new data.");
-      } else {
-        setUpdateStatus("error");
-        setUpdateMsg("Unexpected response: " + res.status);
-      }
+      const { jobId } = await createRes.json();
+
+      setUpdateMsg("Update started — checking status...");
+
+      // Trigger background function with jobId
+      await fetch("/.netlify/functions/update-sanctions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source, jobId }),
+      });
+
+      // Poll for status every 5 seconds
+      const poll = setInterval(async () => {
+        try {
+          const statusRes = await fetch("/.netlify/functions/sanctions?action=job-status&job_id=" + jobId);
+          const { job } = await statusRes.json();
+          if (!job) return;
+          setUpdateMsg(job.message || "Running...");
+          if (job.status === "done") {
+            setUpdateStatus("done");
+            clearInterval(poll);
+            // Reload snapshots
+            fetch("/.netlify/functions/sanctions?action=snapshots")
+              .then(r => r.json())
+              .then(d => setSnapshots(d.snapshots || []));
+          } else if (job.status === "no_change") {
+            setUpdateStatus("no_change");
+            clearInterval(poll);
+          } else if (job.status === "error") {
+            setUpdateStatus("error");
+            clearInterval(poll);
+          }
+        } catch (e) {}
+      }, 5000);
+
+      // Stop polling after 15 minutes max
+      setTimeout(() => clearInterval(poll), 900000);
+
     } catch (err) {
       setUpdateStatus("error");
-      setUpdateMsg("Failed to trigger update: " + err.message);
+      setUpdateMsg("Failed to start update: " + err.message);
     }
   };
 
@@ -352,13 +389,14 @@ function ListManagement() {
       {updateStatus && (
         <div style={{
           marginBottom: 24, padding: "12px 18px", borderRadius: 10, fontSize: 13,
-          background: updateStatus === "error" ? "#fef2f2" : updateStatus === "done" ? "#f0fdf4" : "#f0f7ff",
-          border: "1px solid " + (updateStatus === "error" ? "#fca5a5" : updateStatus === "done" ? "#bbf7d0" : "#bfdbfe"),
-          color: updateStatus === "error" ? "#dc2626" : updateStatus === "done" ? "#166534" : "#1e3a5f",
+          background: updateStatus === "error" ? "#fef2f2" : updateStatus === "done" ? "#f0fdf4" : updateStatus === "no_change" ? "#fffbeb" : "#f0f7ff",
+          border: "1px solid " + (updateStatus === "error" ? "#fca5a5" : updateStatus === "done" ? "#bbf7d0" : updateStatus === "no_change" ? "#fcd34d" : "#bfdbfe"),
+          color: updateStatus === "error" ? "#dc2626" : updateStatus === "done" ? "#166534" : updateStatus === "no_change" ? "#92400e" : "#1e3a5f",
           display: "flex", alignItems: "center", gap: 10,
         }}>
           {updateStatus === "running" && <Spinner size={16} color="#1e3a5f" />}
           {updateStatus === "done" && "✓ "}
+          {updateStatus === "no_change" && "— "}
           {updateStatus === "error" && "⚠ "}
           {updateMsg}
           {updateStatus !== "running" && (

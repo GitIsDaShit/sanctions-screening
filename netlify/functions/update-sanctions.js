@@ -1,12 +1,11 @@
 // netlify/functions/update-sanctions.js
 // Background Function — runs up to 15 minutes asynchronously
-// Triggered via POST /.netlify/functions/update-sanctions
-// Body: { "source": "OFAC" | "EU" | "UN" | "ALL" }
+// Body: { "source": "OFAC" | "EU" | "UN" | "ALL", "jobId": "uuid" }
 
 import crypto from "crypto";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY; // service_role key for writes
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
 const EU_URL = "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw";
 const UN_URL = "https://scsanctions.un.org/resources/xml/en/consolidated.xml";
@@ -32,6 +31,19 @@ async function sb(method, path, body = null) {
   return text ? JSON.parse(text) : null;
 }
 
+async function updateJob(jobId, status, message) {
+  if (!jobId) return;
+  try {
+    await sb("PATCH", `update_job?id=eq.${jobId}`, {
+      status,
+      message,
+      completed_at: status !== "running" ? new Date().toISOString() : null,
+    });
+  } catch (e) {
+    console.error("Could not update job status:", e.message);
+  }
+}
+
 function sha256(str) {
   return crypto.createHash("sha256").update(str).digest("hex");
 }
@@ -43,13 +55,6 @@ function clean(val) {
   return s;
 }
 
-// ── XML parser helper ─────────────────────────────────────────────────────────
-function parseXmlText(xml, tag) {
-  const re = new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`, "i");
-  const m = xml.match(re);
-  return m ? m[1].trim() : null;
-}
-
 function getAttr(str, attr) {
   const re = new RegExp(`${attr}="([^"]*)"`, "i");
   const m = str.match(re);
@@ -57,23 +62,28 @@ function getAttr(str, attr) {
 }
 
 function getTagContent(xml, tag) {
-  const re = new RegExp(`<${tag}(?:[^>]*)>([\s\S]*?)</${tag}>`, "gi");
+  const re = new RegExp(`<${tag}(?:[^>]*)>([\\s\\S]*?)<\\/${tag}>`, "gi");
   const matches = [];
   let m;
   while ((m = re.exec(xml)) !== null) matches.push(m[1]);
   return matches;
 }
 
+function parseXmlText(xml, tag) {
+  const re = new RegExp(`<${tag}[^>]*>([^<]*)<\\/${tag}>`, "i");
+  const m = xml.match(re);
+  return m ? m[1].trim() : null;
+}
+
 // ── OFAC parser ───────────────────────────────────────────────────────────────
 async function loadOfac() {
-  console.log("Fetching OFAC SDN JSON...");
+  console.log("Fetching OFAC...");
   const res = await fetch("https://data.treasury.gov/resource/2s8a-s5y3.json?$limit=50000", {
     headers: { "User-Agent": "Infotrek-Sanctions-Screening/1.0" }
   });
   if (!res.ok) throw new Error(`OFAC fetch failed: ${res.status}`);
   const raw = await res.json();
 
-  // Group by sdn_type + ent_num
   const map = new Map();
   for (const row of raw) {
     const id = clean(row.ent_num);
@@ -84,17 +94,14 @@ async function loadOfac() {
         name: clean(row.sdn_name) || "",
         type: row.sdn_type === "Individual" ? "individual" : row.sdn_type === "Entity" ? "organization" : row.sdn_type === "Vessel" ? "vessel" : row.sdn_type === "Aircraft" ? "aircraft" : "unknown",
         program: clean(row.program),
-        nationality: null,
-        dob: null,
-        aliases: [],
+        nationality: null, dob: null, aliases: [],
       });
     }
   }
 
-  // Compute fingerprints
   const entries = {};
   for (const [id, e] of map) {
-    const fp = sha256(JSON.stringify({ name: e.name, program: e.program, type: e.type, dob: e.dob, nationality: e.nationality, aliases: e.aliases.sort() }));
+    const fp = sha256(JSON.stringify({ name: e.name, program: e.program, type: e.type, dob: e.dob, nationality: e.nationality, aliases: [] }));
     entries[id] = { ...e, _fingerprint: fp };
   }
 
@@ -105,17 +112,15 @@ async function loadOfac() {
 
 // ── EU parser ─────────────────────────────────────────────────────────────────
 async function loadEu() {
-  console.log("Fetching EU sanctions XML...");
+  console.log("Fetching EU...");
   const res = await fetch(EU_URL, { headers: { "User-Agent": "Infotrek-Sanctions-Screening/1.0" } });
   if (!res.ok) throw new Error(`EU fetch failed: ${res.status}`);
   const xml = await res.text();
 
-  // Get generation date
   const genDateMatch = xml.match(/generationDate="([^"]+)"/);
   const sourceDate = genDateMatch ? genDateMatch[1].slice(0, 10) : new Date().toISOString().slice(0, 10);
 
-  const NS = "sanctionEntity";
-  const entityBlocks = getTagContent(xml, NS);
+  const entityBlocks = getTagContent(xml, "sanctionEntity");
   const entries = {};
 
   for (const block of entityBlocks) {
@@ -123,7 +128,6 @@ async function loadEu() {
     const logId = getAttr(block, "logicalId");
     const id = euRef || ("EU-" + logId);
 
-    // Primary name
     const nameAliasBlocks = getTagContent(block, "nameAlias");
     let primaryName = null;
     const aliases = [];
@@ -134,21 +138,16 @@ async function loadEu() {
       if (strong === "true" && !primaryName) primaryName = whole.trim();
       else aliases.push(whole.trim());
     }
-    if (!primaryName && nameAliasBlocks.length > 0) {
-      primaryName = getAttr(nameAliasBlocks[0], "wholeName")?.trim();
-    }
+    if (!primaryName && nameAliasBlocks.length > 0) primaryName = getAttr(nameAliasBlocks[0], "wholeName")?.trim();
     if (!primaryName) continue;
 
-    // Type
     const subtypeBlock = block.match(/<subjectType[^>]*/)?.[0] || "";
     const cc = getAttr(subtypeBlock, "classificationCode") || "";
     const type = { P: "individual", E: "organization", V: "vessel" }[cc] || "unknown";
 
-    // Program
     const regBlock = block.match(/<regulation[^>]*/)?.[0] || "";
     const program = getAttr(regBlock, "programme") || null;
 
-    // DOB
     let dob = null;
     const bdBlocks = block.match(/<birthdate[^>]*/g) || [];
     for (const bd of bdBlocks) {
@@ -156,7 +155,6 @@ async function loadEu() {
       if (d) { dob = d; break; }
     }
 
-    // Nationality
     const citBlock = block.match(/<citizenship[^>]*/)?.[0] || "";
     const nationality = getAttr(citBlock, "countryDescription") || null;
 
@@ -170,7 +168,7 @@ async function loadEu() {
 
 // ── UN parser ─────────────────────────────────────────────────────────────────
 async function loadUn() {
-  console.log("Fetching UN sanctions XML...");
+  console.log("Fetching UN...");
   const res = await fetch(UN_URL, { headers: { "User-Agent": "Infotrek-Sanctions-Screening/1.0" } });
   if (!res.ok) throw new Error(`UN fetch failed: ${res.status}`);
   const xml = await res.text();
@@ -185,30 +183,22 @@ async function loadUn() {
     const first = clean(parseXmlText(block, "FIRST_NAME") || "");
     if (!first) return;
     const id = ref || ("UN-" + etype.slice(0, 3).toUpperCase() + "-" + Math.random().toString(36).slice(2, 10));
-    const parts = [first,
-      clean(parseXmlText(block, "SECOND_NAME")),
-      clean(parseXmlText(block, "THIRD_NAME")),
-      clean(parseXmlText(block, "FOURTH_NAME")),
-    ].filter(Boolean);
+    const parts = [first, clean(parseXmlText(block, "SECOND_NAME")), clean(parseXmlText(block, "THIRD_NAME")), clean(parseXmlText(block, "FOURTH_NAME"))].filter(Boolean);
     const name = parts.join(" ");
     const program = clean(parseXmlText(block, "UN_LIST_TYPE"));
     const nat = clean(parseXmlText(block, "VALUE"));
-
     let dob = null;
     const dobBlocks = getTagContent(block, etype.toUpperCase() + "_DATE_OF_BIRTH");
     for (const db of dobBlocks) {
       const d = clean(parseXmlText(db, "DATE") || parseXmlText(db, "YEAR") || "");
       if (d) { dob = d; break; }
     }
-
     const fp = sha256(JSON.stringify({ name, program, type: etype, dob, nationality: nat, aliases: [] }));
     entries[id] = { id, name, type: etype, program, dob, nationality: nat, aliases: [], _fingerprint: fp };
   }
 
-  const indivBlocks = getTagContent(xml, "INDIVIDUAL");
-  const entityBlocks = getTagContent(xml, "ENTITY");
-  for (const b of indivBlocks) processBlock(b, "individual");
-  for (const b of entityBlocks) processBlock(b, "organization");
+  for (const b of getTagContent(xml, "INDIVIDUAL")) processBlock(b, "individual");
+  for (const b of getTagContent(xml, "ENTITY"))     processBlock(b, "organization");
 
   console.log(`  UN: ${Object.keys(entries).length} entries, date: ${sourceDate}`);
   return { entries, sourceDate, downloadUrl: UN_URL };
@@ -218,7 +208,6 @@ async function loadUn() {
 async function updateSource(source, entries, sourceDate, downloadUrl) {
   console.log(`\n=== Updating ${source} ===`);
   const now = new Date().toISOString();
-  const today = now.slice(0, 10);
 
   // Compute version hash
   const fingerprints = {};
@@ -228,32 +217,30 @@ async function updateSource(source, entries, sourceDate, downloadUrl) {
   // Check if already imported
   const existing = await sb("GET", `list_snapshot?select=id&source=eq.${source}&version_hash=eq.${versionHash}`);
   if (existing && existing.length > 0) {
-    console.log(`  No changes since last import. Skipping.`);
+    console.log(`  No changes since last import.`);
     return { skipped: true, source };
   }
 
-  // Get currently active entities
-  const activeRows = await sb("GET", `entity?select=id,canonical_id&source=eq.${source}&is_active=eq.true`);
-  const activeMap = {}; // canonical_id -> entity_id
-  for (const r of activeRows || []) activeMap[r.canonical_id] = r.id;
+  // Get active entities
+  const activeRows = await sb("GET", `entity?select=id,canonical_id,primary_name&source=eq.${source}&is_active=eq.true`);
+  const activeMap = {};
+  const nameMap = {};
+  for (const r of activeRows || []) { activeMap[r.canonical_id] = r.id; nameMap[r.id] = r.primary_name; }
 
-  // Get current entity versions
-  const versionRows = await sb("GET",
-    `entity_version?select=id,entity_id,program,dob,nationality&entity_id=in.(${Object.values(activeMap).slice(0, 500).join(",") || "00000000-0000-0000-0000-000000000000"})&valid_to=is.null`
-  );
-  const versionMap = {}; // entity_id -> version row
-  for (const r of versionRows || []) versionMap[r.entity_id] = r;
-
-  // Get entity names
-  const nameRows = await sb("GET", `entity?select=id,canonical_id,primary_name&source=eq.${source}&is_active=eq.true`);
-  const nameMap = {}; // entity_id -> name
-  for (const r of nameRows || []) nameMap[r.id] = r.primary_name;
+  // Get current versions (batch — max 500 at a time)
+  const activeIds = Object.values(activeMap);
+  const versionMap = {};
+  for (let i = 0; i < activeIds.length; i += 400) {
+    const batch = activeIds.slice(i, i + 400);
+    const vRows = await sb("GET", `entity_version?select=id,entity_id,program,dob,nationality&entity_id=in.(${batch.join(",")})&valid_to=is.null`);
+    for (const r of vRows || []) versionMap[r.entity_id] = r;
+  }
 
   const existingIds = new Set(Object.keys(activeMap));
   const newIds = new Set(Object.keys(entries));
-  const addedIds = [...newIds].filter(id => !existingIds.has(id));
+  const addedIds   = [...newIds].filter(id => !existingIds.has(id));
   const removedIds = [...existingIds].filter(id => !newIds.has(id));
-  const commonIds = [...newIds].filter(id => existingIds.has(id));
+  const commonIds  = [...newIds].filter(id => existingIds.has(id));
 
   console.log(`  Added: ${addedIds.length}, Removed: ${removedIds.length}, Common: ${commonIds.length}`);
 
@@ -264,92 +251,62 @@ async function updateSource(source, entries, sourceDate, downloadUrl) {
     fetched_at: now,
   });
   const snapshotId = snapResult[0].id;
-  console.log(`  Snapshot created: ${snapshotId}`);
 
   const deltaRows = [];
 
-  // ── REMOVED ────────────────────────────────────────────────────────────────
+  // REMOVED
   for (const cid of removedIds) {
     const entityId = activeMap[cid];
-    const versionId = versionMap[entityId]?.id;
-    if (versionId) await sb("PATCH", `entity_version?id=eq.${versionId}`, { valid_to: now });
+    const ver = versionMap[entityId];
+    if (ver) await sb("PATCH", `entity_version?id=eq.${ver.id}`, { valid_to: now });
     await sb("PATCH", `entity?id=eq.${entityId}`, { is_active: false, last_seen_at: now });
     deltaRows.push({ snapshot_id: snapshotId, entity_id: entityId, change_type: "removed", field_changed: null, old_value: nameMap[entityId] || null, new_value: null, logged_at: now });
   }
 
-  // ── ADDED ──────────────────────────────────────────────────────────────────
+  // ADDED
   for (const cid of addedIds) {
     const e = entries[cid];
-
-    // Check if inactive entity exists
-    const existing = await sb("GET", `entity?select=id&canonical_id=eq.${encodeURIComponent(cid)}&source=eq.${source}&is_active=eq.false`);
+    const existingInactive = await sb("GET", `entity?select=id&canonical_id=eq.${encodeURIComponent(cid)}&source=eq.${source}&is_active=eq.false`);
     let entityId;
-    if (existing && existing.length > 0) {
-      entityId = existing[0].id;
+    if (existingInactive && existingInactive.length > 0) {
+      entityId = existingInactive[0].id;
       await sb("PATCH", `entity?id=eq.${entityId}`, { is_active: true, last_seen_at: now, primary_name: e.name });
     } else {
-      const newEntity = await sb("POST", "entity", {
-        canonical_id: cid, source, entity_type: e.type || "unknown",
-        primary_name: e.name, first_seen_at: now, last_seen_at: now, is_active: true,
-      });
-      entityId = newEntity[0].id;
+      const newEnt = await sb("POST", "entity", { canonical_id: cid, source, entity_type: e.type || "unknown", primary_name: e.name, first_seen_at: now, last_seen_at: now, is_active: true });
+      entityId = newEnt[0].id;
     }
-
-    // Create entity_version
-    const newVersion = await sb("POST", "entity_version", {
-      entity_id: entityId, snapshot_id: snapshotId,
-      program: e.program, gender: e.gender || null,
-      dob: e.dob || null, pob: e.pob || null,
-      nationality: e.nationality || null, valid_from: now, valid_to: null,
-    });
-    const versionId = newVersion[0].id;
-
-    // Create names
+    const newVer = await sb("POST", "entity_version", { entity_id: entityId, snapshot_id: snapshotId, program: e.program, dob: e.dob || null, nationality: e.nationality || null, valid_from: now, valid_to: null });
+    const versionId = newVer[0].id;
     await sb("POST", "name", { entity_version_id: versionId, name_type: "primary", full_name: e.name, language: null });
     for (const alias of (e.aliases || [])) {
       if (alias) await sb("POST", "name", { entity_version_id: versionId, name_type: "alias", full_name: alias, language: null });
     }
-
     deltaRows.push({ snapshot_id: snapshotId, entity_id: entityId, change_type: "added", field_changed: null, old_value: null, new_value: e.name, logged_at: now });
   }
 
-  // ── MODIFIED & UNCHANGED ───────────────────────────────────────────────────
+  // MODIFIED & UNCHANGED
   let modifiedCount = 0;
   const WATCH = [["name", "primary_name", "name"], ["program", "program", "program"], ["dob", "dob", "dob"], ["nationality", "nationality", "nationality"]];
-
-  // Batch fetch all entity names for common ids (to avoid N+1)
-  const commonEntityIds = commonIds.map(cid => activeMap[cid]).filter(Boolean);
 
   for (const cid of commonIds) {
     const e = entries[cid];
     const entityId = activeMap[cid];
     const ver = versionMap[entityId];
-    const existingName = nameMap[entityId];
-
     const changedFields = [];
     for (const [label, oldKey, newKey] of WATCH) {
-      const oldVal = oldKey === "primary_name" ? existingName : ver?.[oldKey];
+      const oldVal = oldKey === "primary_name" ? nameMap[entityId] : ver?.[oldKey];
       const newVal = e[newKey];
       if (oldVal !== newVal) changedFields.push([label, oldVal, newVal]);
     }
-
     if (changedFields.length > 0) {
-      // Close old version
       if (ver) await sb("PATCH", `entity_version?id=eq.${ver.id}`, { valid_to: now });
       await sb("PATCH", `entity?id=eq.${entityId}`, { last_seen_at: now, primary_name: e.name });
-
-      // New version
-      const newVer = await sb("POST", "entity_version", {
-        entity_id: entityId, snapshot_id: snapshotId,
-        program: e.program, dob: e.dob || null, nationality: e.nationality || null,
-        valid_from: now, valid_to: null,
-      });
+      const newVer = await sb("POST", "entity_version", { entity_id: entityId, snapshot_id: snapshotId, program: e.program, dob: e.dob || null, nationality: e.nationality || null, valid_from: now, valid_to: null });
       const newVerId = newVer[0].id;
       await sb("POST", "name", { entity_version_id: newVerId, name_type: "primary", full_name: e.name, language: null });
       for (const alias of (e.aliases || [])) {
         if (alias) await sb("POST", "name", { entity_version_id: newVerId, name_type: "alias", full_name: alias, language: null });
       }
-
       for (const [label, oldVal, newVal] of changedFields) {
         deltaRows.push({ snapshot_id: snapshotId, entity_id: entityId, change_type: "modified", field_changed: label, old_value: oldVal != null ? String(oldVal) : null, new_value: newVal != null ? String(newVal) : null, logged_at: now });
       }
@@ -359,54 +316,63 @@ async function updateSource(source, entries, sourceDate, downloadUrl) {
     }
   }
 
-  console.log(`  Modified: ${modifiedCount}`);
-
-  // ── DELTA LOG ──────────────────────────────────────────────────────────────
-  if (deltaRows.length > 0) {
-    // Insert in batches of 100
-    for (let i = 0; i < deltaRows.length; i += 100) {
-      await sb("POST", "delta_log", deltaRows.slice(i, i + 100));
-    }
-    console.log(`  Delta rows logged: ${deltaRows.length}`);
+  // DELTA LOG — batch insert
+  for (let i = 0; i < deltaRows.length; i += 100) {
+    await sb("POST", "delta_log", deltaRows.slice(i, i + 100));
   }
 
-  console.log(`  Done!`);
-  return { skipped: false, source, added: addedIds.length, removed: removedIds.length, modified: modifiedCount, snapshot_id: snapshotId };
+  console.log(`  Modified: ${modifiedCount}, Delta rows: ${deltaRows.length}`);
+  return { skipped: false, source, added: addedIds.length, removed: removedIds.length, modified: modifiedCount };
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 export default async (req) => {
-  console.log("update-sanctions background function started");
+  console.log("update-sanctions started");
 
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error("Missing SUPABASE_URL or SUPABASE_KEY env vars");
+    console.error("Missing env vars");
     return;
   }
 
   let source = "ALL";
+  let jobId = null;
   try {
     const body = await req.json();
     source = body.source || "ALL";
-  } catch (e) { /* use default */ }
+    jobId  = body.jobId  || null;
+  } catch (e) {}
 
   const sources = source === "ALL" ? ["OFAC", "EU", "UN"] : [source];
   const results = [];
 
   for (const src of sources) {
     try {
+      await updateJob(jobId, "running", "Loading " + src + " from source...");
       let data;
       if (src === "OFAC") data = await loadOfac();
       else if (src === "EU")  data = await loadEu();
       else if (src === "UN")  data = await loadUn();
+      await updateJob(jobId, "running", "Updating " + src + " database...");
       const result = await updateSource(src, data.entries, data.sourceDate, data.downloadUrl);
       results.push(result);
     } catch (err) {
       console.error(`Error updating ${src}:`, err.message);
       results.push({ source: src, error: err.message });
+      await updateJob(jobId, "error", src + " failed: " + err.message);
+      return;
     }
   }
 
-  console.log("update-sanctions completed:", JSON.stringify(results));
+  // Build final status message
+  const msg = results.map(r => {
+    if (r.error)   return r.source + ": Error — " + r.error;
+    if (r.skipped) return r.source + ": No new data available";
+    return r.source + ": +" + r.added + " added, -" + r.removed + " removed, ~" + r.modified + " modified";
+  }).join(" | ");
+
+  const allSkipped = results.every(r => r.skipped);
+  await updateJob(jobId, allSkipped ? "no_change" : "done", msg);
+  console.log("Completed:", msg);
 };
 
 export const config = { type: "async" };
