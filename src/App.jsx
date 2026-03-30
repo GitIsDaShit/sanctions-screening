@@ -986,7 +986,6 @@ Svara på svenska, koncist.`;
               </div>
             )}
           </div>
-          </div>
         )}
 
         {!hasSearched && (
@@ -1003,7 +1002,6 @@ Svara på svenska, koncist.`;
                     return `Jämförs mot ${sanctionsList.length.toLocaleString("sv-SE")} entiteter · OFAC ${ofac.toLocaleString("sv-SE")} · EU ${eu.toLocaleString("sv-SE")} · FN ${un.toLocaleString("sv-SE")} · 5 matchningsalgoritmer + Infotrek AI`;
                   })()}
             </div>
-          </div>
         )}
 
         {/* Footer logga */}
