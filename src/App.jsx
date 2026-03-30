@@ -341,6 +341,7 @@ export default function App() {
   const [deltaTab, setDeltaTab] = useState("OFAC");
   const [deltaSection, setDeltaSection] = useState("added");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [weights, setWeights] = useState({
     jw: true,  jwVal: 25,
     ts: true,  tsVal: 25,
     lev: true, levVal: 15,
