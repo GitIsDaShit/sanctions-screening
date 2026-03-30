@@ -1107,9 +1107,9 @@ export default function App() {
                 if (!cur) return null;
 
                 const sectionCfg = [
-                  { key: "added",   label: "Tillagda",  color: "#16a34a", bg: "#f0fdf4", icon: "+" },
-                  { key: "removed", label: "Borttagna", color: "#dc2626", bg: "#fef2f2", icon: "−" },
-                  { key: "changed", label: "Ändrade",   color: "#d97706", bg: "#fffbeb", icon: "~" },
+                  { key: "added",    label: "Tillagda",  color: "#16a34a", bg: "#f0fdf4", icon: "+" },
+                  { key: "removed",  label: "Borttagna", color: "#dc2626", bg: "#fef2f2", icon: "−" },
+                  { key: "modified", label: "Ändrade",   color: "#d97706", bg: "#fffbeb", icon: "~" },
                 ];
 
                 return (
@@ -1177,7 +1177,7 @@ export default function App() {
                               <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: cfg.color, borderRadius: 4, padding: "2px 6px", flexShrink: 0, marginTop: 1 }}>{cfg.icon}</span>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{row.name || row.entity_id}</div>
-                                {deltaSection === "changed" && row.field_changed && (
+                                {deltaSection === "modified" && row.field_changed && (
                                   <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3 }}>
                                     <span style={{ fontWeight: 600 }}>{row.field_changed}:</span>{" "}
                                     <span style={{ textDecoration: "line-through", color: "#9ca3af" }}>{row.old_value}</span>
