@@ -503,7 +503,7 @@ Svara på svenska, koncist.`;
 
           {/* Entity type filter */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18, alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", letterSpacing: 0.5, marginRight: 4 }}>LISTA:</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", letterSpacing: 0.5, marginRight: 4 }}>ENTITET:</span>
             {[
               { value: "all",          label: "Alla",           count: sanctionsList.length },
               { value: "individual",   label: "Individer",      count: sanctionsList.filter(e => e.type === "individual").length },
@@ -738,6 +738,20 @@ Svara på svenska, koncist.`;
                               textTransform: "uppercase", letterSpacing: 0.5, flexShrink: 0
                             }}>{r.type === "organization" ? "org" : r.type}</span>
                           )}
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10,
+                            background: r.source === "OFAC" ? "#eff6ff"
+                                      : r.source === "EU"   ? "#f0fdf4"
+                                      : "#fef9ec",
+                            color: r.source === "OFAC" ? "#1e40af"
+                                 : r.source === "EU"   ? "#166534"
+                                 : "#92400e",
+                            border: `1px solid ${
+                              r.source === "OFAC" ? "#bfdbfe"
+                            : r.source === "EU"   ? "#bbf7d0"
+                            : "#fcd34d"}`,
+                            textTransform: "uppercase", letterSpacing: 0.5, flexShrink: 0
+                          }}>{r.source === "UN" ? "FN" : r.source}</span>
                         </div>
                         <div style={{ fontSize: 12, color: "#6b7280" }}>
                           Matchad mot: <em>"{r.matchedName}"</em>
