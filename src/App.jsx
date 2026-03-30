@@ -754,6 +754,7 @@ Svara pÃ¥ svenska, koncist.`;
               </div>
             </div>
           </div>
+        </div>
 
         {/* Results */}
         {hasSearched && (
@@ -1040,5 +1041,6 @@ Svara pÃ¥ svenska, koncist.`;
         </div>
       </div>
     </div>
+  </div>
   );
 }
