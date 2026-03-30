@@ -78,36 +78,59 @@ function parseXmlText(xml, tag) {
 // ── OFAC parser ───────────────────────────────────────────────────────────────
 async function loadOfac() {
   console.log("Fetching OFAC...");
-  const res = await fetch("https://data.treasury.gov/resource/2s8a-s5y3.json?$limit=50000", {
-    headers: { "User-Agent": "Infotrek-Sanctions-Screening/1.0" }
+  // Use official OFAC SDN XML feed
+  const res = await fetch("https://www.treasury.gov/ofac/downloads/sdn.xml", {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; Infotrek-Sanctions/1.0)" }
   });
   if (!res.ok) throw new Error(`OFAC fetch failed: ${res.status}`);
-  const raw = await res.json();
-
-  const map = new Map();
-  for (const row of raw) {
-    const id = clean(row.ent_num);
-    if (!id) continue;
-    if (!map.has(id)) {
-      map.set(id, {
-        id,
-        name: clean(row.sdn_name) || "",
-        type: row.sdn_type === "Individual" ? "individual" : row.sdn_type === "Entity" ? "organization" : row.sdn_type === "Vessel" ? "vessel" : row.sdn_type === "Aircraft" ? "aircraft" : "unknown",
-        program: clean(row.program),
-        nationality: null, dob: null, aliases: [],
-      });
-    }
-  }
-
-  const entries = {};
-  for (const [id, e] of map) {
-    const fp = sha256(JSON.stringify({ name: e.name, program: e.program, type: e.type, dob: e.dob, nationality: e.nationality, aliases: [] }));
-    entries[id] = { ...e, _fingerprint: fp };
+  const xml = await res.text();
+  if (xml.trim().startsWith("<html") || xml.trim().startsWith("<!DOCTYPE")) {
+    throw new Error("OFAC returned HTML instead of XML — may be rate limited");
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  console.log(`  OFAC: ${Object.keys(entries).length} entries`);
-  return { entries, sourceDate: today, downloadUrl: "https://data.treasury.gov/resource/2s8a-s5y3.json" };
+  const entries = {};
+
+  // Parse SDN entries from XML
+  const sdnBlocks = getTagContent(xml, "sdnEntry");
+  for (const block of sdnBlocks) {
+    const uid = parseXmlText(block, "uid");
+    if (!uid) continue;
+    const lastName  = clean(parseXmlText(block, "lastName")  || "");
+    const firstName = clean(parseXmlText(block, "firstName") || "");
+    const name = firstName ? firstName + " " + lastName : lastName;
+    if (!name.trim()) continue;
+
+    const sdnType = parseXmlText(block, "sdnType") || "";
+    const type = sdnType === "Individual" ? "individual"
+               : sdnType === "Entity"     ? "organization"
+               : sdnType === "Vessel"     ? "vessel"
+               : sdnType === "Aircraft"   ? "aircraft" : "unknown";
+
+    // Programs
+    const progBlocks = getTagContent(block, "program");
+    const program = progBlocks.join("] [");
+
+    // Aliases (akas)
+    const akaBlocks = getTagContent(block, "aka");
+    const aliases = akaBlocks.map(a => {
+      const aLast  = clean(parseXmlText(a, "lastName")  || "");
+      const aFirst = clean(parseXmlText(a, "firstName") || "");
+      return aFirst ? aFirst + " " + aLast : aLast;
+    }).filter(Boolean);
+
+    // DOB
+    const dob = clean(parseXmlText(block, "dateOfBirthItem") || parseXmlText(block, "dateOfBirth") || "");
+
+    // Nationality
+    const nationality = clean(parseXmlText(block, "nationality") || "");
+
+    const fp = sha256(JSON.stringify({ name, program, type, dob, nationality, aliases: [...aliases].sort() }));
+    entries[uid] = { id: uid, name, type, program, dob, nationality, aliases, _fingerprint: fp };
+  }
+
+  console.log(`  OFAC: ${Object.keys(entries).length} entries, date: ${today}`);
+  return { entries, sourceDate: today, downloadUrl: "https://www.treasury.gov/ofac/downloads/sdn.xml" };
 }
 
 // ── EU parser ─────────────────────────────────────────────────────────────────
