@@ -290,9 +290,15 @@ function ListManagement() {
                   <div style={{ fontSize: 28, fontWeight: 700, color: "#111827", marginBottom: 2 }}>{latest.entity_count.toLocaleString("en-US")}</div>
                   <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8 }}>entities</div>
                   <div style={{ fontSize: 12, color: "#374151" }}>
-                    <span style={{ color: "#9ca3af" }}>Last updated: </span>
+                    <span style={{ color: "#9ca3af" }}>Published date: </span>
                     <strong>{latest.snapshot_date}</strong>
                   </div>
+                  {latest.fetched_at && (
+                    <div style={{ fontSize: 12, color: "#374151", marginTop: 3 }}>
+                      <span style={{ color: "#9ca3af" }}>Loaded: </span>
+                      {new Date(latest.fetched_at).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })}
+                    </div>
+                  )}
                   {diff !== null && (
                     <div style={{ marginTop: 6, fontSize: 12, fontWeight: 600, color: diff > 0 ? "#16a34a" : diff < 0 ? "#dc2626" : "#9ca3af" }}>
                       {diff > 0 ? "+" : ""}{diff} since {prev.snapshot_date}
@@ -319,7 +325,7 @@ function ListManagement() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f9fafb" }}>
-                {["Source", "Date", "Entities", "Version hash"].map(h => (
+                {["Source", "Published date", "Loaded date", "Entities", "Version hash"].map(h => (
                   <th key={h} style={{ padding: "10px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: 0.8, borderBottom: "1px solid #e5e7eb" }}>{h.toUpperCase()}</th>
                 ))}
               </tr>
@@ -329,12 +335,22 @@ function ListManagement() {
                 const col = sourceColors[s.source] || sourceColors.OFAC;
                 const prev = snapshots.find((p, pi) => pi > i && p.source === s.source);
                 const diff = prev ? s.entity_count - prev.entity_count : null;
+                const fetchedAt = s.fetched_at
+                  ? new Date(s.fetched_at).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" })
+                  : "—";
                 return (
                   <tr key={s.id} style={{ borderBottom: "1px solid #f3f4f6" }}>
                     <td style={{ padding: "12px 20px" }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: col.text, background: col.bg, border: "1px solid " + col.border, borderRadius: 5, padding: "2px 8px" }}>{s.source}</span>
                     </td>
-                    <td style={{ padding: "12px 20px", fontSize: 13, color: "#374151", fontWeight: 500 }}>{s.snapshot_date}</td>
+                    <td style={{ padding: "12px 20px" }}>
+                      <div style={{ fontSize: 13, color: "#111827", fontWeight: 600 }}>{s.snapshot_date}</div>
+                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Published by source</div>
+                    </td>
+                    <td style={{ padding: "12px 20px" }}>
+                      <div style={{ fontSize: 13, color: "#374151" }}>{fetchedAt}</div>
+                      <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>Loaded into DB</div>
+                    </td>
                     <td style={{ padding: "12px 20px" }}>
                       <span style={{ fontSize: 13, color: "#111827", fontWeight: 600 }}>{s.entity_count.toLocaleString("en-US")}</span>
                       {diff !== null && (
