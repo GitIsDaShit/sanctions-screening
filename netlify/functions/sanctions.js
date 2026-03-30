@@ -52,7 +52,72 @@ export default async (req) => {
       });
     }
 
-    // Hämta entiteter - filtrera på snapshot_id om angivet
+    // Beräkna delta mellan senaste och föregående snapshot per källa
+    if (action === "delta") {
+      // Hämta alla snapshots
+      const snapRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/list_snapshot?select=id,source,snapshot_date,entity_count&order=snapshot_date.desc,source.asc`,
+        { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      if (!snapRes.ok) throw new Error("Kunde inte hämta snapshots");
+      const allSnaps = await snapRes.json();
+
+      // Gruppera per källa, ta de två senaste
+      const bySource = {};
+      for (const s of allSnaps) {
+        if (!bySource[s.source]) bySource[s.source] = [];
+        if (bySource[s.source].length < 2) bySource[s.source].push(s);
+      }
+
+      const results = {};
+      for (const [src, snaps] of Object.entries(bySource)) {
+        if (snaps.length < 2) {
+          results[src] = { newest: snaps[0], previous: null, added: [], removed: [], changed: [] };
+          continue;
+        }
+        const [newest, previous] = snaps;
+
+        // Hämta delta_log för senaste snapshot
+        const deltaRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/delta_log?select=id,entity_id,change_type,field_changed,old_value,new_value,logged_at&snapshot_id=eq.${newest.id}&order=change_type.asc,logged_at.desc`,
+          { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
+        );
+        if (!deltaRes.ok) throw new Error("Kunde inte hämta delta_log för " + src);
+        const deltaRows = await deltaRes.json();
+
+        // Hämta entitetsnamn för berörda entity_ids
+        const entityIds = [...new Set(deltaRows.map(d => d.entity_id))].slice(0, 500);
+        let entityNames = {};
+        if (entityIds.length > 0) {
+          const entRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/entity?select=id,primary_name&id=in.(${entityIds.join(",")})`,
+            { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
+          );
+          if (entRes.ok) {
+            const ents = await entRes.json();
+            for (const e of ents) entityNames[e.id] = e.primary_name;
+          }
+        }
+
+        // Berika delta-rader med namn
+        const enrich = rows => rows.map(d => ({ ...d, name: entityNames[d.entity_id] || d.entity_id }));
+
+        results[src] = {
+          newest,
+          previous,
+          added:   enrich(deltaRows.filter(d => d.change_type === "added")),
+          removed: enrich(deltaRows.filter(d => d.change_type === "removed")),
+          changed: enrich(deltaRows.filter(d => d.change_type === "changed")),
+        };
+      }
+
+      return new Response(JSON.stringify({ delta: results }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
+      });
+    }
+
+
     const params = snapshotId ? { p_snapshot_id: snapshotId } : {};
     const rows = await rpc("get_sanctions_entries", params);
 

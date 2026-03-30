@@ -334,7 +334,13 @@ export default function App() {
   const [entityFilter, setEntityFilter] = useState("all");
   const [snapshots, setSnapshots] = useState([]);
   const [selectedSnapshot, setSelectedSnapshot] = useState("latest");
-  const [weights, setWeights] = useState({
+  const [showDelta, setShowDelta] = useState(false);
+  const [deltaData, setDeltaData] = useState(null);
+  const [deltaLoading, setDeltaLoading] = useState(false);
+  const [deltaError, setDeltaError] = useState(null);
+  const [deltaTab, setDeltaTab] = useState("OFAC");
+  const [deltaSection, setDeltaSection] = useState("added");
+  const [sourceFilter, setSourceFilter] = useState("all");
     jw: true,  jwVal: 25,
     ts: true,  tsVal: 25,
     lev: true, levVal: 15,
@@ -393,6 +399,23 @@ export default function App() {
     setExpanded(null);
   };
 
+  const openDelta = () => {
+    setShowDelta(true);
+    if (deltaData) return; // redan laddat
+    setDeltaLoading(true);
+    setDeltaError(null);
+    fetch("/.netlify/functions/sanctions?action=delta")
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(data => {
+        setDeltaData(data.delta);
+        // Sätt första tillgängliga källa som aktiv tab
+        const firstSrc = Object.keys(data.delta)[0];
+        if (firstSrc) setDeltaTab(firstSrc);
+        setDeltaLoading(false);
+      })
+      .catch(err => { setDeltaError(err.message); setDeltaLoading(false); });
+  };
+
   const runAiAnalysis = async () => {
     setAiLoading(true);
     setAiAnalysis(null);
@@ -430,7 +453,6 @@ export default function App() {
     setAiLoading(false);
   };
 
-  const [sourceFilter, setSourceFilter] = useState("all");
   const [activeSource, setActiveSource] = useState({});  // groupKey -> source
 
   const filtered = results.filter(r =>
@@ -484,7 +506,7 @@ export default function App() {
       {/* Header */}
       <div style={{ background: "#1e3a5f", padding: "14px 32px", display: "flex", alignItems: "center", gap: 16 }}>
         <span style={{ fontSize: 20 }}>🛡</span>
-        <div>
+        <div style={{ flex: 1 }}>
           <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Sanctions Screening</div>
           <div style={{ color: "#93c5fd", fontSize: 12 }}>
             {listLoading
@@ -500,6 +522,14 @@ export default function App() {
             }
           </div>
         </div>
+        <button onClick={openDelta} style={{
+          background: "rgba(255,255,255,0.1)", border: "1.5px solid rgba(255,255,255,0.25)",
+          color: "#fff", borderRadius: 8, padding: "8px 16px", fontSize: 13, fontWeight: 600,
+          cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6,
+          whiteSpace: "nowrap"
+        }}>
+          📊 Listförändringar
+        </button>
       </div>
 
       <div style={{ maxWidth: 860, margin: "0 auto", padding: "28px 20px" }}>
@@ -1043,6 +1073,138 @@ export default function App() {
           </svg>
         </div>
       </div>
+
+      {/* Delta modal */}
+      {showDelta && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowDelta(false); }}>
+          <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 780, maxHeight: "88vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}>
+
+            {/* Modal header */}
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>📊 Listförändringar</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Senaste vs föregående uppdatering per källa</div>
+              </div>
+              <button onClick={() => setShowDelta(false)} style={{ background: "#f3f4f6", border: "none", borderRadius: 8, width: 32, height: 32, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
+            </div>
+
+            {/* Modal body */}
+            <div style={{ overflowY: "auto", flex: 1, padding: "20px 24px" }}>
+              {deltaLoading && (
+                <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>
+                  <div style={{ width: 32, height: 32, border: "3px solid #e5e7eb", borderTop: "3px solid #1e3a5f", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 16px" }} />
+                  Hämtar förändringar...
+                </div>
+              )}
+              {deltaError && (
+                <div style={{ padding: 24, background: "#fef2f2", borderRadius: 10, color: "#dc2626", fontSize: 14 }}>⚠ {deltaError}</div>
+              )}
+              {deltaData && !deltaLoading && (() => {
+                const sources = Object.keys(deltaData);
+                const cur = deltaData[deltaTab] || deltaData[sources[0]];
+                if (!cur) return null;
+
+                const sectionCfg = [
+                  { key: "added",   label: "Tillagda",  color: "#16a34a", bg: "#f0fdf4", icon: "+" },
+                  { key: "removed", label: "Borttagna", color: "#dc2626", bg: "#fef2f2", icon: "−" },
+                  { key: "changed", label: "Ändrade",   color: "#d97706", bg: "#fffbeb", icon: "~" },
+                ];
+
+                return (
+                  <div>
+                    {/* Källtabs */}
+                    <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+                      {sources.map(src => (
+                        <button key={src} onClick={() => setDeltaTab(src)} style={{
+                          padding: "6px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+                          cursor: "pointer", fontFamily: "inherit",
+                          background: deltaTab === src ? "#1e3a5f" : "#f3f4f6",
+                          color: deltaTab === src ? "#fff" : "#374151",
+                          border: "none"
+                        }}>{src === "UN" ? "FN" : src}</button>
+                      ))}
+                    </div>
+
+                    {/* Snapshots-info */}
+                    {cur.previous ? (
+                      <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+                        <div style={{ flex: 1, background: "#f8fafc", borderRadius: 8, padding: "12px 16px", border: "1px solid #e2e8f0" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: 1, marginBottom: 4 }}>FÖREGÅENDE</div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "#374151" }}>{cur.previous.snapshot_date}</div>
+                          <div style={{ fontSize: 12, color: "#9ca3af" }}>{cur.previous.entity_count.toLocaleString("sv-SE")} entiteter</div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", color: "#9ca3af", fontSize: 20 }}>→</div>
+                        <div style={{ flex: 1, background: "#f0f7ff", borderRadius: 8, padding: "12px 16px", border: "1px solid #bfdbfe" }}>
+                          <div style={{ fontSize: 10, fontWeight: 700, color: "#3b82f6", letterSpacing: 1, marginBottom: 4 }}>SENASTE</div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: "#1e3a5f" }}>{cur.newest.snapshot_date}</div>
+                          <div style={{ fontSize: 12, color: "#6b7280" }}>{cur.newest.entity_count.toLocaleString("sv-SE")} entiteter</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ padding: 16, background: "#f8fafc", borderRadius: 8, color: "#9ca3af", fontSize: 13, marginBottom: 20 }}>
+                        Ingen föregående snapshot — detta är första inläsningen.
+                      </div>
+                    )}
+
+                    {/* Statistik-kort */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+                      {sectionCfg.map(({ key, label, color, bg, icon }) => (
+                        <button key={key} onClick={() => setDeltaSection(key)} style={{
+                          padding: "14px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
+                          background: deltaSection === key ? bg : "#f9fafb",
+                          border: "2px solid " + (deltaSection === key ? color : "#e5e7eb"),
+                          textAlign: "left"
+                        }}>
+                          <div style={{ fontSize: 22, fontWeight: 700, color }}>{icon} {cur[key].length}</div>
+                          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>{label} entiteter</div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Entitetslista */}
+                    {cur[deltaSection].length === 0 ? (
+                      <div style={{ textAlign: "center", padding: 32, color: "#9ca3af", fontSize: 14 }}>
+                        Inga {sectionCfg.find(s => s.key === deltaSection)?.label.toLowerCase()} entiteter
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {cur[deltaSection].slice(0, 200).map((row, i) => {
+                          const cfg = sectionCfg.find(s => s.key === deltaSection);
+                          return (
+                            <div key={i} style={{ padding: "10px 14px", borderRadius: 8, background: cfg.bg, border: "1px solid " + (deltaSection === "added" ? "#bbf7d0" : deltaSection === "removed" ? "#fca5a5" : "#fcd34d"), display: "flex", alignItems: "flex-start", gap: 10 }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: "#fff", background: cfg.color, borderRadius: 4, padding: "2px 6px", flexShrink: 0, marginTop: 1 }}>{cfg.icon}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827" }}>{row.name || row.entity_id}</div>
+                                {deltaSection === "changed" && row.field_changed && (
+                                  <div style={{ fontSize: 11, color: "#6b7280", marginTop: 3 }}>
+                                    <span style={{ fontWeight: 600 }}>{row.field_changed}:</span>{" "}
+                                    <span style={{ textDecoration: "line-through", color: "#9ca3af" }}>{row.old_value}</span>
+                                    {" → "}
+                                    <span style={{ color: "#111827" }}>{row.new_value}</span>
+                                  </div>
+                                )}
+                                <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2 }}>
+                                  {row.logged_at ? new Date(row.logged_at).toLocaleDateString("sv-SE") : ""}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {cur[deltaSection].length > 200 && (
+                          <div style={{ textAlign: "center", padding: 12, color: "#9ca3af", fontSize: 12 }}>
+                            + {(cur[deltaSection].length - 200).toLocaleString("sv-SE")} till...
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
