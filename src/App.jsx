@@ -382,7 +382,7 @@ export default function App() {
     const topHits = results.filter(r => r.scores.combined >= 50).slice(0, 5);
     const prompt = `Du är en expert på sanktionsscreening för en europeisk bank.
 
-En kund med namnet "${query}" har screenats mot OFAC SDN-listan.
+En kund med namnet "${query}" har screenats mot sanktionslistor (${sourceFilter === "all" ? "OFAC, EU och FN" : sourceFilter === "UN" ? "FN" : sourceFilter}).
 
 ALGORITMISKA RESULTAT:
 ${topHits.map(r => `- ${r.name} (${r.nationality || r.country || "okänt land"}, ${r.program}) — score: ${r.scores.combined}/100, matchad mot: "${r.matchedName}"`).join("\n")}
@@ -448,7 +448,7 @@ Svara på svenska, koncist.`;
           <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Sanctions Screening</div>
           <div style={{ color: "#93c5fd", fontSize: 12 }}>
             {listLoading
-              ? "Laddar OFAC SDN-lista..."
+              ? "Laddar sanktionslistor..."
               : listError
               ? `⚠ Fel vid laddning: ${listError}`
               : (() => {
@@ -693,7 +693,7 @@ Svara på svenska, koncist.`;
               {filtered.length === 0 && (
                 <div style={{ background: "#fff", borderRadius: 10, padding: "48px", textAlign: "center", color: "#6b7280", fontSize: 14, border: "1px solid #e5e7eb" }}>
                   <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
-                  Inga träffar över {threshold}% — kunden finns inte på OFAC SDN-listan
+                  Inga träffar över {threshold}% — kunden finns inte på {sourceFilter === "all" ? "någon sanktionslista" : sourceFilter === "UN" ? "FN:s sanktionslista" : `${sourceFilter}:s sanktionslista`}
                 </div>
               )}
               {filtered.map((r, i) => {
@@ -889,13 +889,12 @@ Svara på svenska, koncist.`;
             <div style={{ fontSize: 16, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Ange ett namn för att screena</div>
             <div style={{ fontSize: 13, color: "#9ca3af" }}>
               {listLoading
-                ? "Laddar OFAC SDN-lista..."
+                ? "Laddar sanktionslistor..."
                 : (() => {
-                    const individuals   = sanctionsList.filter(e => e.type === "individual").length;
-                    const organizations = sanctionsList.filter(e => e.type === "organization").length;
-                    const vessels       = sanctionsList.filter(e => e.type === "vessel").length;
-                    const aircraft      = sanctionsList.filter(e => e.type === "aircraft").length;
-                    return `Jämförs mot ${sanctionsList.length.toLocaleString("sv-SE")} entiteter · ${individuals.toLocaleString("sv-SE")} individer · ${organizations.toLocaleString("sv-SE")} organisationer · ${vessels.toLocaleString("sv-SE")} fartyg · ${aircraft.toLocaleString("sv-SE")} luftfarkoster · 5 matchningsalgoritmer + Infotrek AI`;
+                    const ofac = sanctionsList.filter(e => e.source === "OFAC").length;
+                    const eu   = sanctionsList.filter(e => e.source === "EU").length;
+                    const un   = sanctionsList.filter(e => e.source === "UN").length;
+                    return `Jämförs mot ${sanctionsList.length.toLocaleString("sv-SE")} entiteter · OFAC ${ofac.toLocaleString("sv-SE")} · EU ${eu.toLocaleString("sv-SE")} · FN ${un.toLocaleString("sv-SE")} · 5 matchningsalgoritmer + Infotrek AI`;
                   })()}
             </div>
           </div>
