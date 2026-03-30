@@ -986,7 +986,7 @@ Svara på svenska, koncist.`;
               </div>
             )}
           </div>
-        </div>
+          </div>
         )}
 
         {!hasSearched && (
