@@ -72,7 +72,7 @@ export default async (req) => {
       const results = {};
       for (const [src, snaps] of Object.entries(bySource)) {
         if (snaps.length < 2) {
-          results[src] = { newest: snaps[0], previous: null, added: [], removed: [], changed: [] };
+          results[src] = { newest: snaps[0], previous: null, added: [], removed: [], modified: [] };
           continue;
         }
         const [newest, previous] = snaps;
@@ -105,9 +105,9 @@ export default async (req) => {
         results[src] = {
           newest,
           previous,
-          added:   enrich(deltaRows.filter(d => d.change_type === "added")),
-          removed: enrich(deltaRows.filter(d => d.change_type === "removed")),
-          changed: enrich(deltaRows.filter(d => d.change_type === "changed")),
+          added:    enrich(deltaRows.filter(d => d.change_type === "added")),
+          removed:  enrich(deltaRows.filter(d => d.change_type === "removed")),
+          modified: enrich(deltaRows.filter(d => d.change_type === "modified")),
         };
       }
 
