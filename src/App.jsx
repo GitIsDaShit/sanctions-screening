@@ -346,11 +346,11 @@ export default function App() {
   const activeCount = [weights.jw, weights.ts, weights.lev, weights.ngr, weights.mph].filter(Boolean).length;
   const filteredList = entityFilter === "all" ? sanctionsList : sanctionsList.filter(e => e.type === entityFilter);
 
-  const loadList = (snapshotDate) => {
+  const loadList = (snapshotId) => {
     setListLoading(true);
     setListError(null);
-    const url = snapshotDate && snapshotDate !== "latest"
-      ? `/.netlify/functions/sanctions?snapshot_date=${snapshotDate}`
+    const url = snapshotId && snapshotId !== "latest"
+      ? `/.netlify/functions/sanctions?snapshot_id=${snapshotId}`
       : "/.netlify/functions/sanctions";
     fetch(url)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
@@ -654,18 +654,21 @@ export default function App() {
                       <>
                         <option disabled>──────────────</option>
                         {snapshots.map(s => (
-                          <option key={s.id} value={s.snapshot_date}>
+                          <option key={s.id} value={s.id}>
                             {s.source} – {s.snapshot_date} ({s.entity_count.toLocaleString("sv-SE")} entiteter)
                           </option>
                         ))}
                       </>
                     )}
                   </select>
-                  {selectedSnapshot !== "latest" && (
-                    <div style={{ fontSize: 10, color: "#f59e0b", marginTop: 4 }}>
-                      ⚠ Screenar mot historisk lista från {selectedSnapshot}
-                    </div>
-                  )}
+                  {selectedSnapshot !== "latest" && (() => {
+                    const snap = snapshots.find(s => s.id === selectedSnapshot);
+                    return snap ? (
+                      <div style={{ fontSize: 10, color: "#f59e0b", marginTop: 4 }}>
+                        ⚠ Screenar mot {snap.source}-lista från {snap.snapshot_date}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               </div>
 
