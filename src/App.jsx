@@ -332,6 +332,8 @@ export default function App() {
   const [listError, setListError] = useState(null);
   const [showConfig, setShowConfig] = useState(true);
   const [entityFilter, setEntityFilter] = useState("all");
+  const [snapshots, setSnapshots] = useState([]);
+  const [selectedSnapshot, setSelectedSnapshot] = useState("latest");
   const [weights, setWeights] = useState({
     jw: true,  jwVal: 25,
     ts: true,  tsVal: 25,
@@ -344,11 +346,26 @@ export default function App() {
   const activeCount = [weights.jw, weights.ts, weights.lev, weights.ngr, weights.mph].filter(Boolean).length;
   const filteredList = entityFilter === "all" ? sanctionsList : sanctionsList.filter(e => e.type === entityFilter);
 
-  useEffect(() => {
-    fetch("/.netlify/functions/sanctions")
+  const loadList = (snapshotDate) => {
+    setListLoading(true);
+    setListError(null);
+    const url = snapshotDate && snapshotDate !== "latest"
+      ? `/.netlify/functions/sanctions?snapshot_date=${snapshotDate}`
+      : "/.netlify/functions/sanctions";
+    fetch(url)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(data => { setSanctionsList(data.entries || data); setListLoading(false); })
       .catch(err => { setListError(err.message); setListLoading(false); });
+  };
+
+  useEffect(() => {
+    // Hämta snapshots för dropdown
+    fetch("/.netlify/functions/sanctions?action=snapshots")
+      .then(r => r.json())
+      .then(data => setSnapshots(data.snapshots || []))
+      .catch(() => {});
+    // Hämta senaste listan
+    loadList(null);
   }, []);
 
   useEffect(() => {
@@ -508,7 +525,7 @@ Svara på svenska, koncist.`;
           </div>
 
           {/* Example chips */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
             <span style={{ fontSize: 12, color: "#9ca3af", alignSelf: "center", marginRight: 2 }}>Prova:</span>
             {EXAMPLES.map(name => (
               <button key={name} onClick={() => {
@@ -524,168 +541,219 @@ Svara på svenska, koncist.`;
             ))}
           </div>
 
-          {/* Entity type filter */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18, alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", letterSpacing: 0.5, marginRight: 4 }}>ENTITET:</span>
-            {[
-              { value: "all",          label: "Alla",           count: sanctionsList.length },
-              { value: "individual",   label: "Individer",      count: sanctionsList.filter(e => e.type === "individual").length },
-              { value: "organization", label: "Organisationer", count: sanctionsList.filter(e => e.type === "organization").length },
-              { value: "vessel",       label: "Fartyg",         count: sanctionsList.filter(e => e.type === "vessel").length },
-              { value: "aircraft",     label: "Luftfarkoster",  count: sanctionsList.filter(e => e.type === "aircraft").length },
-            ].map(({ value, label, count }) => (
-              <button key={value} onClick={() => setEntityFilter(value)} style={{
-                padding: "5px 12px",
-                background: entityFilter === value ? "#1e3a5f" : "#fff",
-                border: `1.5px solid ${entityFilter === value ? "#1e3a5f" : "#d1d5db"}`,
-                borderRadius: 6, fontSize: 12,
-                color: entityFilter === value ? "#fff" : "#4b5563",
-                cursor: "pointer", fontFamily: "inherit",
-                fontWeight: entityFilter === value ? 600 : 400,
-                display: "flex", alignItems: "center", gap: 5
-              }}>
-                {label}
-                <span style={{
-                  fontSize: 10, fontWeight: 700,
-                  background: entityFilter === value ? "rgba(255,255,255,0.2)" : "#f3f4f6",
-                  color: entityFilter === value ? "#fff" : "#9ca3af",
-                  padding: "1px 5px", borderRadius: 10
-                }}>{count.toLocaleString("sv-SE")}</span>
-              </button>
-            ))}
-          </div>
+          {/* ── Konfigurationspanel ─────────────────────────────────────── */}
+          <div style={{ background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 12, marginBottom: 20, overflow: "hidden" }}>
 
-          {/* Source filter */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18, alignItems: "center" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", letterSpacing: 0.5, marginRight: 4 }}>KÄLLA:</span>
-            {[
-              { value: "all",  label: "Alla",  count: sanctionsList.length },
-              { value: "OFAC", label: "OFAC",  count: sanctionsList.filter(e => e.source === "OFAC").length },
-              { value: "EU",   label: "EU",    count: sanctionsList.filter(e => e.source === "EU").length },
-              { value: "UN",   label: "FN",    count: sanctionsList.filter(e => e.source === "UN").length },
-            ].map(({ value, label, count }) => (
-              <button key={value} onClick={() => setSourceFilter(value)} style={{
-                padding: "5px 12px",
-                background: sourceFilter === value ? "#1e3a5f" : "#fff",
-                border: `1.5px solid ${sourceFilter === value ? "#1e3a5f" : "#d1d5db"}`,
-                borderRadius: 6, fontSize: 12,
-                color: sourceFilter === value ? "#fff" : "#4b5563",
-                cursor: "pointer", fontFamily: "inherit",
-                fontWeight: sourceFilter === value ? 600 : 400,
-                display: "flex", alignItems: "center", gap: 5
-              }}>
-                {label}
-                <span style={{
-                  fontSize: 10, fontWeight: 700,
-                  background: sourceFilter === value ? "rgba(255,255,255,0.2)" : "#f3f4f6",
-                  color: sourceFilter === value ? "#fff" : "#9ca3af",
-                  padding: "1px 5px", borderRadius: 10
-                }}>{count.toLocaleString("sv-SE")}</span>
-              </button>
-            ))}
-          </div>
+            {/* Panel header */}
+            <div style={{ padding: "12px 18px", background: "#f1f5f9", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", letterSpacing: 0.8 }}>⚙ SCREENINGKONFIGURATION</span>
+              <span style={{ fontSize: 11, color: "#94a3b8" }}>Inställningarna påverkar alla sökningar</span>
+            </div>
 
-          {/* Threshold */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-            <label style={{ fontSize: 13, color: "#374151", fontWeight: 500, minWidth: 60 }}>Tröskel</label>
-            <input type="range" min={30} max={95} value={threshold}
-              onChange={e => setThreshold(+e.target.value)}
-              style={{ flex: 1, maxWidth: 200, accentColor: "#1e3a5f" }} />
-            <span style={{ fontSize: 15, fontWeight: 700, color: "#1e3a5f", minWidth: 38 }}>{threshold}%</span>
-            <span style={{ fontSize: 12, color: "#9ca3af" }}>
-              {threshold >= 85 ? "Strikt – bara tydliga träffar" : threshold >= 70 ? "Balanserad" : "Känslig – fler träffar"}
-            </span>
-          </div>
+            <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 16 }}>
 
-          {/* Algorithm config toggle */}
-          <div>
-            <button onClick={() => setShowConfig(v => !v)} style={{
-              background: "none", border: "1px solid #e5e7eb", borderRadius: 6,
-              padding: "6px 12px", fontSize: 12, color: "#6b7280", cursor: "pointer",
-              fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6
-            }}>
-              ⚙ Algoritmkonfiguration
-              <span style={{ fontSize: 10, color: "#9ca3af" }}>({activeCount}/5 aktiva)</span>
-              <span style={{ fontSize: 10 }}>{showConfig ? "▲" : "▼"}</span>
-            </button>
+              {/* Rad 1: Källa + Entitet */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
-            {showConfig && (
-              <div style={{ marginTop: 12, padding: "16px", background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
-              <style>{`
-                .algo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-                .algo-label { width: 130px; flex-shrink: 0; }
-                .algo-slider { flex: 1; max-width: 160px; }
-                .algo-raw { width: 36px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
-                .algo-pct { width: 44px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
-                @media (max-width: 520px) {
-                  .algo-row { flex-wrap: wrap; gap: 8px; padding-bottom: 10px; border-bottom: 1px solid #f3f4f6; }
-                  .algo-label { width: 100%; }
-                  .algo-slider { max-width: 100%; flex: 1; min-width: 80px; }
-                }
-              `}</style>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 14 }}>
-                VÄLJ ALGORITMER OCH VIKTER — vikterna normaliseras automatiskt
-              </div>
-              {(() => {
-                const algos = [
-                  { key: "jw",  valKey: "jwVal",  label: "Jaro-Winkler",     desc: "Teckenbaserad likhet",         color: "#3b82f6",
-                    tooltip: "Mäter likhet baserat på gemensamma tecken och transpositioner. Ger extra poäng för matchande prefix. Bra för stavvarianter som 'Erik' vs 'Eric'." },
-                  { key: "ts",  valKey: "tsVal",  label: "Token-sort",        desc: "Ordningsokänslig jämförelse",  color: "#10b981",
-                    tooltip: "Delar upp namnet i tokens (ord), sorterar dem alfabetiskt och jämför sedan. Gör att 'Ali Hassan' och 'Hassan Ali' får högt score oavsett ordning." },
-                  { key: "lev", valKey: "levVal", label: "Levenshtein",       desc: "Edit-avstånd",                 color: "#f59e0b",
-                    tooltip: "Räknar minimalt antal insättningar, borttagningar och ersättningar för att omvandla ett namn till ett annat. 'Mohammed' vs 'Mohammad' = avstånd 2." },
-                  { key: "ngr", valKey: "ngrVal", label: "N-gram (trigram)",  desc: "Delsträcksöverlapp",           color: "#8b5cf6",
-                    tooltip: "Delar upp namn i överlappande 3-teckensblock (trigrams) och mäter andelen gemensamma block. Robust mot längre namnvarianter och translitterering." },
-                  { key: "mph", valKey: "mphVal", label: "Double Metaphone",  desc: "Fonetisk likhet",              color: "#ec4899",
-                    tooltip: "Kodar namnet fonetiskt – hur det låter snarare än hur det stavas. 'Vladimir' och 'Wladimir' får samma kod. Speciellt bra för arabiska och slaviska namn." },
-                ];
-                const totalWeight = algos.reduce((sum, a) => sum + (weights[a.key] ? weights[a.valKey] : 0), 0);
-                return algos.map(({ key, valKey, label, desc, color, tooltip }) => {
-                  const normPct = totalWeight > 0 && weights[key]
-                    ? Math.round((weights[valKey] / totalWeight) * 100)
-                    : 0;
-                  return (
-                    <div key={key} className="algo-row">
-                      <input type="checkbox" checked={weights[key]} onChange={e => setWeight(key, e.target.checked)}
-                        style={{ width: 16, height: 16, accentColor: color, cursor: "pointer", flexShrink: 0 }} />
-                      <div className="algo-label">
-                        <div style={{ fontSize: 13, fontWeight: 600, color: weights[key] ? "#111827" : "#9ca3af", display: "flex", alignItems: "center", gap: 5 }}>
-                          {label}
-                          <span title={tooltip} style={{
-                            display: "inline-flex", alignItems: "center", justifyContent: "center",
-                            width: 15, height: 15, borderRadius: "50%",
-                            background: "#e5e7eb", color: "#6b7280",
-                            fontSize: 10, fontWeight: 700, cursor: "help", flexShrink: 0
-                          }}>?</span>
-                        </div>
-                        <div style={{ fontSize: 11, color: "#9ca3af" }}>{desc}</div>
-                      </div>
-                      <input type="range" min={1} max={100} value={weights[valKey]}
-                        disabled={!weights[key]}
-                        onChange={e => setWeight(valKey, +e.target.value)}
-                        className="algo-slider"
-                        style={{ accentColor: color, opacity: weights[key] ? 1 : 0.3 }} />
-                      <div className="algo-raw" style={{ background: weights[key] ? color : "#e5e7eb" }}>
-                        {weights[valKey]}
-                      </div>
-                      <div className="algo-pct" style={{
-                        background: weights[key] ? "#f0f7ff" : "#f9fafb",
-                        border: `1px solid ${weights[key] ? "#bfdbfe" : "#e5e7eb"}`,
-                        color: weights[key] ? "#1e3a5f" : "#9ca3af"
+                {/* Källa */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>KÄLLA</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {[
+                      { value: "all",  label: "Alla",  count: sanctionsList.length },
+                      { value: "OFAC", label: "OFAC",  count: sanctionsList.filter(e => e.source === "OFAC").length },
+                      { value: "EU",   label: "EU",    count: sanctionsList.filter(e => e.source === "EU").length },
+                      { value: "UN",   label: "FN",    count: sanctionsList.filter(e => e.source === "UN").length },
+                    ].map(({ value, label, count }) => (
+                      <button key={value} onClick={() => setSourceFilter(value)} style={{
+                        padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
+                        fontWeight: sourceFilter === value ? 700 : 400,
+                        background: sourceFilter === value ? "#1e3a5f" : "#fff",
+                        border: `1.5px solid ${sourceFilter === value ? "#1e3a5f" : "#cbd5e1"}`,
+                        color: sourceFilter === value ? "#fff" : "#475569",
+                        display: "flex", alignItems: "center", gap: 4
                       }}>
-                        {normPct}%
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
-                <div style={{ marginTop: 10, fontSize: 12, color: "#9ca3af", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
-                  Kombinerat score = viktat medelvärde av aktiva algoritmer (normaliserat till 100%)
+                        {label}
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, padding: "1px 4px", borderRadius: 8,
+                          background: sourceFilter === value ? "rgba(255,255,255,0.2)" : "#f1f5f9",
+                          color: sourceFilter === value ? "#fff" : "#94a3b8",
+                        }}>{count.toLocaleString("sv-SE")}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Entitet */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>ENTITETSTYP</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                    {[
+                      { value: "all",          label: "Alla",        count: sanctionsList.length },
+                      { value: "individual",   label: "Individer",   count: sanctionsList.filter(e => e.type === "individual").length },
+                      { value: "organization", label: "Org",         count: sanctionsList.filter(e => e.type === "organization").length },
+                      { value: "vessel",       label: "Fartyg",      count: sanctionsList.filter(e => e.type === "vessel").length },
+                      { value: "aircraft",     label: "Flyg",        count: sanctionsList.filter(e => e.type === "aircraft").length },
+                    ].map(({ value, label, count }) => (
+                      <button key={value} onClick={() => setEntityFilter(value)} style={{
+                        padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
+                        fontWeight: entityFilter === value ? 700 : 400,
+                        background: entityFilter === value ? "#1e3a5f" : "#fff",
+                        border: `1.5px solid ${entityFilter === value ? "#1e3a5f" : "#cbd5e1"}`,
+                        color: entityFilter === value ? "#fff" : "#475569",
+                        display: "flex", alignItems: "center", gap: 4
+                      }}>
+                        {label}
+                        <span style={{
+                          fontSize: 9, fontWeight: 700, padding: "1px 4px", borderRadius: 8,
+                          background: entityFilter === value ? "rgba(255,255,255,0.2)" : "#f1f5f9",
+                          color: entityFilter === value ? "#fff" : "#94a3b8",
+                        }}>{count.toLocaleString("sv-SE")}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            )}
+
+              {/* Rad 2: Tröskel + Snapshot */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+
+                {/* Tröskel */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>MATCHNINGSTRÖSKEL</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <input type="range" min={30} max={95} value={threshold}
+                      onChange={e => setThreshold(+e.target.value)}
+                      style={{ flex: 1, accentColor: "#1e3a5f" }} />
+                    <span style={{ fontSize: 15, fontWeight: 700, color: "#1e3a5f", minWidth: 38 }}>{threshold}%</span>
+                    <span style={{ fontSize: 11, color: "#94a3b8", minWidth: 80 }}>
+                      {threshold >= 85 ? "Strikt" : threshold >= 70 ? "Balanserad" : "Känslig"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Snapshot */}
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>LISTVERSION (DATUM)</div>
+                  <select
+                    value={selectedSnapshot}
+                    onChange={e => {
+                      setSelectedSnapshot(e.target.value);
+                      loadList(e.target.value === "latest" ? null : e.target.value);
+                      setHasSearched(false);
+                      setResults([]);
+                    }}
+                    style={{
+                      width: "100%", padding: "6px 10px", borderRadius: 6, fontSize: 12,
+                      border: "1.5px solid #cbd5e1", background: "#fff", color: "#374151",
+                      fontFamily: "inherit", cursor: "pointer"
+                    }}
+                  >
+                    <option value="latest">Senaste (aktuell)</option>
+                    {snapshots.length > 0 && (
+                      <>
+                        <option disabled>──────────────</option>
+                        {snapshots.map(s => (
+                          <option key={s.id} value={s.snapshot_date}>
+                            {s.source} – {s.snapshot_date} ({s.entity_count.toLocaleString("sv-SE")} entiteter)
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                  {selectedSnapshot !== "latest" && (
+                    <div style={{ fontSize: 10, color: "#f59e0b", marginTop: 4 }}>
+                      ⚠ Screenar mot historisk lista från {selectedSnapshot}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Rad 3: Algoritmer (kollapsbar) */}
+              <div>
+                <button onClick={() => setShowConfig(v => !v)} style={{
+                  background: "none", border: "1.5px solid #e2e8f0", borderRadius: 6,
+                  padding: "6px 12px", fontSize: 11, color: "#64748b", cursor: "pointer",
+                  fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, fontWeight: 600
+                }}>
+                  ALGORITMER & VIKTER
+                  <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 400 }}>({activeCount}/5 aktiva)</span>
+                  <span style={{ fontSize: 10 }}>{showConfig ? "▲" : "▼"}</span>
+                </button>
+
+                {showConfig && (
+                  <div style={{ marginTop: 10, padding: "14px", background: "#fff", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                  <style>{`
+                    .algo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+                    .algo-label { width: 130px; flex-shrink: 0; }
+                    .algo-slider { flex: 1; max-width: 160px; }
+                    .algo-raw { width: 36px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
+                    .algo-pct { width: 44px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+                  `}</style>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: 1, marginBottom: 12 }}>
+                    VÄLJ ALGORITMER OCH VIKTER — vikterna normaliseras automatiskt
+                  </div>
+                  {(() => {
+                    const algos = [
+                      { key: "jw",  valKey: "jwVal",  label: "Jaro-Winkler",     desc: "Teckenbaserad likhet",         color: "#3b82f6",
+                        tooltip: "Mäter likhet baserat på gemensamma tecken och transpositioner. Ger extra poäng för matchande prefix. Bra för stavvarianter som 'Erik' vs 'Eric'." },
+                      { key: "ts",  valKey: "tsVal",  label: "Token-sort",        desc: "Ordningsokänslig jämförelse",  color: "#10b981",
+                        tooltip: "Delar upp namnet i tokens (ord), sorterar dem alfabetiskt och jämför sedan. Gör att 'Ali Hassan' och 'Hassan Ali' får högt score oavsett ordning." },
+                      { key: "lev", valKey: "levVal", label: "Levenshtein",       desc: "Edit-avstånd",                 color: "#f59e0b",
+                        tooltip: "Räknar minimalt antal insättningar, borttagningar och ersättningar för att omvandla ett namn till ett annat. 'Mohammed' vs 'Mohammad' = avstånd 2." },
+                      { key: "ngr", valKey: "ngrVal", label: "N-gram (trigram)",  desc: "Delsträcksöverlapp",           color: "#8b5cf6",
+                        tooltip: "Delar upp namn i överlappande 3-teckensblock (trigrams) och mäter andelen gemensamma block. Robust mot längre namnvarianter och translitterering." },
+                      { key: "mph", valKey: "mphVal", label: "Double Metaphone",  desc: "Fonetisk likhet",              color: "#ec4899",
+                        tooltip: "Kodar namnet fonetiskt – hur det låter snarare än hur det stavas. 'Vladimir' och 'Wladimir' får samma kod. Speciellt bra för arabiska och slaviska namn." },
+                    ];
+                    const totalWeight = algos.reduce((sum, a) => sum + (weights[a.key] ? weights[a.valKey] : 0), 0);
+                    return algos.map(({ key, valKey, label, desc, color, tooltip }) => {
+                      const normPct = totalWeight > 0 && weights[key]
+                        ? Math.round((weights[valKey] / totalWeight) * 100)
+                        : 0;
+                      return (
+                        <div key={key} className="algo-row">
+                          <input type="checkbox" checked={weights[key]} onChange={e => setWeight(key, e.target.checked)}
+                            style={{ width: 16, height: 16, accentColor: color, cursor: "pointer", flexShrink: 0 }} />
+                          <div className="algo-label">
+                            <div style={{ fontSize: 13, fontWeight: 600, color: weights[key] ? "#111827" : "#9ca3af", display: "flex", alignItems: "center", gap: 5 }}>
+                              {label}
+                              <span title={tooltip} style={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                width: 15, height: 15, borderRadius: "50%",
+                                background: "#e5e7eb", color: "#6b7280",
+                                fontSize: 10, fontWeight: 700, cursor: "help", flexShrink: 0
+                              }}>?</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: "#9ca3af" }}>{desc}</div>
+                          </div>
+                          <input type="range" min={1} max={100} value={weights[valKey]}
+                            disabled={!weights[key]}
+                            onChange={e => setWeight(valKey, +e.target.value)}
+                            className="algo-slider"
+                            style={{ accentColor: color, opacity: weights[key] ? 1 : 0.3 }} />
+                          <div className="algo-raw" style={{ background: weights[key] ? color : "#e5e7eb" }}>
+                            {weights[valKey]}
+                          </div>
+                          <div className="algo-pct" style={{
+                            background: weights[key] ? "#f0f7ff" : "#f9fafb",
+                            border: `1px solid ${weights[key] ? "#bfdbfe" : "#e5e7eb"}`,
+                            color: weights[key] ? "#1e3a5f" : "#9ca3af"
+                          }}>
+                            {normPct}%
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                    <div style={{ marginTop: 10, fontSize: 12, color: "#9ca3af", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
+                      Kombinerat score = viktat medelvärde av aktiva algoritmer (normaliserat till 100%)
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
 
         {/* Results */}
         {hasSearched && (
