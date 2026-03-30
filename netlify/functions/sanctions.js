@@ -54,28 +54,33 @@ export default async (req) => {
 
     // Beräkna delta mellan senaste och föregående snapshot per källa
     if (action === "delta") {
-      // Hämta alla snapshots
+      // Hämta alla snapshots sorterade per källa och datum
       const snapRes = await fetch(
-        `${SUPABASE_URL}/rest/v1/list_snapshot?select=id,source,snapshot_date,entity_count&order=snapshot_date.desc,source.asc`,
+        `${SUPABASE_URL}/rest/v1/list_snapshot?select=id,source,snapshot_date,entity_count,fetched_at&order=fetched_at.desc`,
         { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
       );
       if (!snapRes.ok) throw new Error("Kunde inte hämta snapshots");
       const allSnaps = await snapRes.json();
 
-      // Gruppera per källa, ta de två senaste
+      // Per källa: hitta senaste snapshot, sedan senaste med ANNAT datum som "föregående"
       const bySource = {};
       for (const s of allSnaps) {
-        if (!bySource[s.source]) bySource[s.source] = [];
-        if (bySource[s.source].length < 2) bySource[s.source].push(s);
+        if (!bySource[s.source]) bySource[s.source] = { newest: null, previous: null };
+        const entry = bySource[s.source];
+        if (!entry.newest) {
+          entry.newest = s;
+        } else if (!entry.previous && s.snapshot_date !== entry.newest.snapshot_date) {
+          entry.previous = s;
+        }
       }
 
       const results = {};
-      for (const [src, snaps] of Object.entries(bySource)) {
-        if (snaps.length < 2) {
-          results[src] = { newest: snaps[0], previous: null, added: [], removed: [], modified: [] };
+      for (const [src, { newest, previous }] of Object.entries(bySource)) {
+        if (!newest) continue;
+        if (!previous) {
+          results[src] = { newest, previous: null, added: [], removed: [], modified: [] };
           continue;
         }
-        const [newest, previous] = snaps;
 
         // Hämta delta_log för senaste snapshot
         const deltaRes = await fetch(
@@ -99,7 +104,6 @@ export default async (req) => {
           }
         }
 
-        // Berika delta-rader med namn
         const enrich = rows => rows.map(d => ({ ...d, name: entityNames[d.entity_id] || d.entity_id }));
 
         results[src] = {
