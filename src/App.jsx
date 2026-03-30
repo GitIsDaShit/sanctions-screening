@@ -444,7 +444,7 @@ Svara på svenska, koncist.`;
   }).sort((a, b) => b.bestScore - a.bestScore);
 
   const topScore = grouped[0]?.bestScore ?? 0;
-  const EXAMPLES = ["Vlademir Poutine", "Kim Jong Un", "Hassan Ali Rashid", "Carlos Ramirez", "Omar Bashir", "Ivan Wolkow", "Banco Nacional de Cuba", "Nord Stream"];
+  const EXAMPLES = ["Abdifatah Abubakar Abdi", "Vlademir Poutine", "Kim Jong Un", "Ivan Wolkow", "Banco Nacional de Cuba", "Nord Stream"];
 
   return (
     <div style={{ minHeight: "100vh", background: "#f3f4f6", fontFamily: "'Inter', system-ui, sans-serif" }}>
