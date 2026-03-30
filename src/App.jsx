@@ -426,15 +426,22 @@ Svara på svenska, koncist.`;
   const groupedMap = new Map();
   for (const r of filtered) {
     const key = normalize(r.name);
-    if (!groupedMap.has(key)) groupedMap.set(key, []);
-    groupedMap.get(key).push(r);
+    if (!groupedMap.has(key)) groupedMap.set(key, { name: r.name, bySource: {} });
+    const group = groupedMap.get(key);
+    // Behåll bara bästa träff per källa
+    if (!group.bySource[r.source] || r.scores.combined > group.bySource[r.source].scores.combined) {
+      group.bySource[r.source] = r;
+    }
   }
-  const grouped = Array.from(groupedMap.entries()).map(([key, hits]) => ({
-    key,
-    name: hits[0].name,
-    bestScore: Math.max(...hits.map(h => h.scores.combined)),
-    hits,
-  })).sort((a, b) => b.bestScore - a.bestScore);
+  const grouped = Array.from(groupedMap.entries()).map(([key, { name, bySource }]) => {
+    const hits = Object.values(bySource);
+    return {
+      key,
+      name,
+      bestScore: Math.max(...hits.map(h => h.scores.combined)),
+      hits,
+    };
+  }).sort((a, b) => b.bestScore - a.bestScore);
 
   const topScore = grouped[0]?.bestScore ?? 0;
   const EXAMPLES = ["Vlademir Poutine", "Kim Jong Un", "Hassan Ali Rashid", "Carlos Ramirez", "Omar Bashir", "Ivan Wolkow", "Banco Nacional de Cuba", "Nord Stream"];
