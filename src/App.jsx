@@ -414,13 +414,29 @@ Svara på svenska, koncist.`;
   };
 
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [activeSource, setActiveSource] = useState({});  // groupKey -> source
 
   const filtered = results.filter(r =>
     r.scores.combined >= threshold &&
     (entityFilter === "all" || r.type === entityFilter) &&
     (sourceFilter === "all" || r.source === sourceFilter)
   );
-  const topScore = filtered[0]?.scores.combined ?? 0;
+
+  // Gruppera träffar med samma namn
+  const groupedMap = new Map();
+  for (const r of filtered) {
+    const key = normalize(r.name);
+    if (!groupedMap.has(key)) groupedMap.set(key, []);
+    groupedMap.get(key).push(r);
+  }
+  const grouped = Array.from(groupedMap.entries()).map(([key, hits]) => ({
+    key,
+    name: hits[0].name,
+    bestScore: Math.max(...hits.map(h => h.scores.combined)),
+    hits,
+  })).sort((a, b) => b.bestScore - a.bestScore);
+
+  const topScore = grouped[0]?.bestScore ?? 0;
   const EXAMPLES = ["Vlademir Poutine", "Kim Jong Un", "Hassan Ali Rashid", "Carlos Ramirez", "Omar Bashir", "Ivan Wolkow", "Banco Nacional de Cuba", "Nord Stream"];
 
   return (
@@ -669,9 +685,10 @@ Svara på svenska, koncist.`;
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div style={{ fontSize: 14, color: "#6b7280" }}>
-                <span style={{ fontWeight: 600, color: "#111827" }}>{filtered.length}</span> träffar över {threshold}%
+                <span style={{ fontWeight: 600, color: "#111827" }}>{grouped.length}</span> träffar över {threshold}%
+                {grouped.length !== filtered.length && <span style={{ color: "#9ca3af", fontSize: 12 }}> ({filtered.length} totalt inkl. dubbletter)</span>}
                 {topScore >= 90 && <span style={{ marginLeft: 14, color: "#dc2626", fontWeight: 600 }}>⚠ Möjlig match hittad</span>}
-                {topScore < 70 && filtered.length > 0 && <span style={{ marginLeft: 14, color: "#16a34a", fontWeight: 500 }}>✓ Inga starka träffar</span>}
+                {topScore < 70 && grouped.length > 0 && <span style={{ marginLeft: 14, color: "#16a34a", fontWeight: 500 }}>✓ Inga starka träffar</span>}
               </div>
               {filtered.some(r => r.scores.combined >= 50) && (
                 <button onClick={runAiAnalysis} disabled={aiLoading} style={{
@@ -696,13 +713,14 @@ Svara på svenska, koncist.`;
                   Inga träffar över {threshold}% — kunden finns inte på {sourceFilter === "all" ? "någon sanktionslista" : sourceFilter === "UN" ? "FN:s sanktionslista" : `${sourceFilter}:s sanktionslista`}
                 </div>
               )}
-              {filtered.map((r, i) => {
-                const risk = getRisk(r.scores.combined);
-                const isOpen = expanded === r.id;
+              {grouped.map((group, i) => {
+                const r = group.hits.find(h => h.source === (activeSource[group.key] || group.hits[0].source)) || group.hits[0];
+                const risk = getRisk(group.bestScore);
+                const isOpen = expanded === group.key;
                 const programDesc = getProgramLabel(r.program);
                 return (
-                  <div key={r.id} className="row-enter" style={{ animationDelay: `${i * 30}ms`, background: risk.bg, border: `1.5px solid ${risk.border}`, borderRadius: 10, overflow: "hidden" }}>
-                    <div onClick={() => setExpanded(isOpen ? null : r.id)}
+                  <div key={group.key} className="row-enter" style={{ animationDelay: `${i * 30}ms`, background: risk.bg, border: `1.5px solid ${risk.border}`, borderRadius: 10, overflow: "hidden" }}>
+                    <div onClick={() => setExpanded(isOpen ? null : group.key)}
                       style={{ padding: "15px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
 
                       {/* Score circle */}
@@ -711,58 +729,49 @@ Svara på svenska, koncist.`;
                         border: `2px solid ${risk.border}`, display: "flex", flexDirection: "column",
                         alignItems: "center", justifyContent: "center", flexShrink: 0
                       }}>
-                        <span style={{ fontSize: 17, fontWeight: 700, color: risk.scoreColor, lineHeight: 1 }}>{r.scores.combined}</span>
+                        <span style={{ fontSize: 17, fontWeight: 700, color: risk.scoreColor, lineHeight: 1 }}>{group.bestScore}</span>
                         <span style={{ fontSize: 9, color: "#9ca3af" }}>/ 100</span>
                       </div>
 
-                      {/* Name & program */}
+                      {/* Name & source badges */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: "#111827", marginBottom: 3, display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: "#111827", marginBottom: 5, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                           {r.name}
                           {r.type && r.type !== "individual" && (
                             <span style={{
                               fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10,
-                              background: r.type === "vessel"       ? "#eff6ff"
-                                        : r.type === "aircraft"     ? "#f0fdf4"
-                                        : r.type === "organization" ? "#fef9ec"
-                                        : "#f5f3ff",
-                              color: r.type === "vessel"       ? "#1e40af"
-                                   : r.type === "aircraft"     ? "#14532d"
-                                   : r.type === "organization" ? "#7c4a0a"
-                                   : "#5b21b6",
-                              border: `1px solid ${
-                                r.type === "vessel"       ? "#bfdbfe"
-                              : r.type === "aircraft"     ? "#bbf7d0"
-                              : r.type === "organization" ? "#fcd34d"
-                              : "#ddd6fe"}`,
+                              background: r.type === "vessel" ? "#eff6ff" : r.type === "aircraft" ? "#f0fdf4" : r.type === "organization" ? "#fef9ec" : "#f5f3ff",
+                              color: r.type === "vessel" ? "#1e40af" : r.type === "aircraft" ? "#14532d" : r.type === "organization" ? "#7c4a0a" : "#5b21b6",
+                              border: `1px solid ${r.type === "vessel" ? "#bfdbfe" : r.type === "aircraft" ? "#bbf7d0" : r.type === "organization" ? "#fcd34d" : "#ddd6fe"}`,
                               textTransform: "uppercase", letterSpacing: 0.5, flexShrink: 0
                             }}>{r.type === "organization" ? "org" : r.type}</span>
                           )}
-                          <span style={{
-                            fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 10,
-                            background: r.source === "OFAC" ? "#eff6ff"
-                                      : r.source === "EU"   ? "#f0fdf4"
-                                      : "#fef9ec",
-                            color: r.source === "OFAC" ? "#1e40af"
-                                 : r.source === "EU"   ? "#166534"
-                                 : "#92400e",
-                            border: `1px solid ${
-                              r.source === "OFAC" ? "#bfdbfe"
-                            : r.source === "EU"   ? "#bbf7d0"
-                            : "#fcd34d"}`,
-                            textTransform: "uppercase", letterSpacing: 0.5, flexShrink: 0
-                          }}>{r.source === "UN" ? "FN" : r.source}</span>
                         </div>
-                        <div style={{ fontSize: 12, color: "#6b7280" }}>
-                          Matchad mot: <em>"{r.matchedName}"</em>
-                          <span
-                            title={programDesc || r.program}
-                            style={{
-                              marginLeft: 10, color: "#9ca3af",
-                              cursor: programDesc ? "help" : "default",
-                              borderBottom: programDesc ? "1px dotted #d1d5db" : "none"
-                            }}
-                          >· {r.program}</span>
+                        {/* Klickbara källbadges */}
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {group.hits.map(h => {
+                            const isActive = h.source === (activeSource[group.key] || group.hits[0].source);
+                            const sourceLabel = h.source === "UN" ? "FN" : h.source;
+                            const srcColors = {
+                              OFAC: { bg: "#eff6ff", color: "#1e40af", border: "#bfdbfe", activeBg: "#1e40af" },
+                              EU:   { bg: "#f0fdf4", color: "#166534", border: "#bbf7d0", activeBg: "#166534" },
+                              UN:   { bg: "#fef9ec", color: "#92400e", border: "#fcd34d", activeBg: "#92400e" },
+                            }[h.source] || { bg: "#f3f4f6", color: "#374151", border: "#d1d5db", activeBg: "#374151" };
+                            return (
+                              <span key={h.source}
+                                onClick={e => { e.stopPropagation(); setActiveSource(prev => ({ ...prev, [group.key]: h.source })); if (!isOpen) setExpanded(group.key); }}
+                                style={{
+                                  fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 10,
+                                  background: isActive ? srcColors.activeBg : srcColors.bg,
+                                  color: isActive ? "#fff" : srcColors.color,
+                                  border: `1.5px solid ${isActive ? srcColors.activeBg : srcColors.border}`,
+                                  textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer",
+                                  transition: "all 0.15s"
+                                }}
+                                title={`Visa detaljer från ${sourceLabel}`}
+                              >{sourceLabel} {h.scores.combined}</span>
+                            );
+                          })}
                         </div>
                       </div>
 
@@ -772,7 +781,7 @@ Svara på svenska, koncist.`;
                         <div style={{ fontSize: 11, color: "#9ca3af" }}>{r.nationality || r.country || "—"}</div>
                       </div>
 
-                      {/* Badge */}
+                      {/* Risk badge */}
                       <span style={{
                         padding: "5px 13px", borderRadius: 20, background: risk.badge,
                         color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0
@@ -785,6 +794,12 @@ Svara på svenska, koncist.`;
                     {isOpen && (
                       <div style={{ padding: "16px 18px 20px", borderTop: `1px solid ${risk.border}`, background: "#fff" }}>
 
+                        {/* Källindikator */}
+                        <div style={{ marginBottom: 14, fontSize: 12, color: "#6b7280" }}>
+                          Visar data från: <strong style={{ color: "#1e3a5f" }}>{r.source === "UN" ? "FN" : r.source}</strong>
+                          {group.hits.length > 1 && <span style={{ marginLeft: 6, color: "#9ca3af" }}>— klicka på källbadge ovan för att byta</span>}
+                        </div>
+
                         {/* Program description */}
                         {programDesc && (
                           <div style={{ marginBottom: 16, padding: "10px 14px", background: "#f0f7ff", borderRadius: 6, fontSize: 13, color: "#1e3a5f" }}>
@@ -794,7 +809,6 @@ Svara på svenska, koncist.`;
                         )}
 
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: 20 }}>
-
                           {/* Personuppgifter */}
                           <div>
                             <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 10 }}>PERSONUPPGIFTER</div>
@@ -806,7 +820,8 @@ Svara på svenska, koncist.`;
                               ["Födelsedatum", r.dob],
                               ["Födelseort", r.pob],
                               ["Nationalitet", r.nationality],
-                              ["OFAC ID", r.id],
+                              ["Matchad mot", `"${r.matchedName}"`],
+                              [r.source === "OFAC" ? "OFAC ID" : r.source === "EU" ? "EU Ref" : "FN Ref", r.id],
                             ].filter(([, v]) => v).map(([label, value]) => (
                               <div key={label} style={{ marginBottom: 6 }}>
                                 <span style={{ fontSize: 11, color: "#9ca3af" }}>{label}</span>
