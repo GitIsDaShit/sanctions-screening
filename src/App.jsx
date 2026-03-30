@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 
 function normalize(s) {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-// ── Levenshtein ───────────────────────────────────────────────────────────────
+// â”€â”€ Levenshtein â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function levenshtein(a, b) {
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, (_, i) =>
@@ -17,7 +17,7 @@ function levenshtein(a, b) {
   return dp[m][n];
 }
 
-// ── Jaro-Winkler ──────────────────────────────────────────────────────────────
+// â”€â”€ Jaro-Winkler â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function jaroWinkler(s1, s2) {
   if (s1 === s2) return 1;
   const l1 = s1.length, l2 = s2.length;
@@ -46,14 +46,14 @@ function jaroWinkler(s1, s2) {
   return jaro + prefix * 0.1 * (1 - jaro);
 }
 
-// ── Token-sort ────────────────────────────────────────────────────────────────
+// â”€â”€ Token-sort â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function tokenSort(a, b) {
   const ta = normalize(a).split(" ").sort().join(" ");
   const tb = normalize(b).split(" ").sort().join(" ");
   return jaroWinkler(ta, tb);
 }
 
-// ── N-gram similarity (trigrams) ──────────────────────────────────────────────
+// â”€â”€ N-gram similarity (trigrams) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ngrams(s, n = 3) {
   const padded = " ".repeat(n - 1) + s + " ".repeat(n - 1);
   const result = new Set();
@@ -69,8 +69,8 @@ function ngramSimilarity(a, b, n = 3) {
   return (2 * intersection) / (ga.size + gb.size);
 }
 
-// ── Double Metaphone (förenklad implementation) ───────────────────────────────
-// Fonetisk kodning – "Mohammed" och "Muhammad" får samma/liknande kod
+// â”€â”€ Double Metaphone (fÃ¶renklad implementation) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Fonetisk kodning â€“ "Mohammed" och "Muhammad" fÃ¥r samma/liknande kod
 function doubleMetaphone(str) {
   if (!str) return ["", ""];
   const s = normalize(str).toUpperCase().replace(/[^A-Z]/g, "");
@@ -84,7 +84,7 @@ function doubleMetaphone(str) {
   const add = (p, sec = null) => { primary += p; secondary += (sec !== null ? sec : p); };
   const isVowel = (c) => "AEIOU".includes(c);
 
-  // Hoppa över initiala icke-bokstäver
+  // Hoppa Ã¶ver initiala icke-bokstÃ¤ver
   if ("GN KN PN AE WR".split(" ").some(v => substr(0, 2) === v)) i = 1;
   if (at(0) === "X") { add("S"); i = 1; }
 
@@ -158,7 +158,7 @@ function metaphoneSimilarity(a, b) {
   return Math.max(...scores);
 }
 
-// ── Kombinerad scoring med konfigurerbar viktning ─────────────────────────────
+// â”€â”€ Kombinerad scoring med konfigurerbar viktning â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function scoreMatch(query, candidate, weights) {
   const q = normalize(query), c = normalize(candidate);
   const jw  = jaroWinkler(q, c);
@@ -210,91 +210,91 @@ function screenName(query, list, weights) {
 }
 
 const getRisk = (score) => {
-  if (score >= 90) return { label: "TRÄFF",    bg: "#fef2f2", border: "#fca5a5", badge: "#dc2626", scoreColor: "#dc2626" };
+  if (score >= 90) return { label: "TRÃ„FF",    bg: "#fef2f2", border: "#fca5a5", badge: "#dc2626", scoreColor: "#dc2626" };
   if (score >= 70) return { label: "GRANSKAS", bg: "#fffbeb", border: "#fcd34d", badge: "#d97706", scoreColor: "#d97706" };
   if (score >= 50) return { label: "SVAG",     bg: "#f9fafb", border: "#d1d5db", badge: "#6b7280", scoreColor: "#6b7280" };
   return             { label: "OK",          bg: "#f9fafb", border: "#e5e7eb", badge: "#9ca3af", scoreColor: "#9ca3af" };
 };
 
-const flagEmoji = (c) => ({ RU:"🇷🇺",KP:"🇰🇵",BY:"🇧🇾",SY:"🇸🇾",IR:"🇮🇷",IQ:"🇮🇶",CO:"🇨🇴",LY:"🇱🇾",SD:"🇸🇩" }[c] || "🌐");
+const flagEmoji = (c) => ({ RU:"ðŸ‡·ðŸ‡º",KP:"ðŸ‡°ðŸ‡µ",BY:"ðŸ‡§ðŸ‡¾",SY:"ðŸ‡¸ðŸ‡¾",IR:"ðŸ‡®ðŸ‡·",IQ:"ðŸ‡®ðŸ‡¶",CO:"ðŸ‡¨ðŸ‡´",LY:"ðŸ‡±ðŸ‡¾",SD:"ðŸ‡¸ðŸ‡©" }[c] || "ðŸŒ");
 
 const PROGRAM_NAMES = {
-  "BALKANS":             "Västra Balkan – Sanktionsprogram",
-  "BALKANS-EO14033":     "Västra Balkan – Executivorder 14033",
-  "BELARUS":             "Belarus – Sanktionsprogram",
-  "BELARUS-EO14038":     "Belarus – Executivorder 14038",
-  "BURMA-EO14014":       "Burma/Myanmar – Executivorder 14014",
-  "CAATSA - IRAN":       "CAATSA – Sanctions mot Iran",
-  "CAATSA - RUSSIA":     "CAATSA – Countering America's Adversaries Through Sanctions Act (Ryssland)",
-  "CAR":                 "Centralafrikanska republiken – Sanktionsprogram",
-  "CUBA":                "Kuba – Sanktionsprogram",
-  "CYBER2":              "Cyberoperationer – Executivorder 13694",
-  "CYBER3":              "Cyberoperationer – Executivorder 13757",
-  "CYBER4":              "Cyberoperationer – Executivorder 13983",
-  "DARFUR":              "Darfur/Sudan – Sanktionsprogram",
-  "DPRK":                "Nordkorea – Sanktionsprogram",
-  "DPRK2":               "Nordkorea – Executivorder 13722",
-  "DPRK3":               "Nordkorea – Executivorder 13810",
-  "DPRK4":               "Nordkorea – Executivorder 13882",
-  "DRCONGO":             "Demokratiska republiken Kongo – Sanktionsprogram",
-  "ELECTION-EO13848":    "Valintegritet – Executivorder 13848",
-  "ETHIOPIA-EO14046":    "Etiopien – Executivorder 14046",
-  "GLOMAG":              "Global Magnitsky – Mänskliga rättigheter och korruption",
-  "HK-EO13936":          "Hongkong – Executivorder 13936",
-  "HOSTAGES-EO14078":    "Gisslantagning – Executivorder 14078",
-  "HRIT-IR":             "Iran – Human Rights and Terrorism",
-  "HRIT-SY":             "Syrien – Human Rights and Terrorism",
-  "ICC-EO14203":         "Internationella brottmålsdomstolen – Executivorder 14203",
-  "IFCA":                "Iran – Freedom and Counter-Proliferation Act",
-  "IFSR":                "Iran – Financial Sanctions Regulations",
-  "ILLICIT-DRUGS-EO14059": "Narkotikahandel – Executivorder 14059",
-  "IRAN":                "Iran – Sanktionsprogram",
-  "IRAN-CON-ARMS-EO":    "Iran – Vapenembargo",
-  "IRAN-EO13846":        "Iran – Executivorder 13846",
-  "IRAN-EO13876":        "Iran – Executivorder 13876 (järn, stål, aluminium)",
-  "IRAN-EO13902":        "Iran – Executivorder 13902 (tillverkningssektorn)",
-  "IRAN-HR":             "Iran – Mänskliga rättigheter",
-  "IRAN-TRA":            "Iran – Threat Reduction and Syria Human Rights Act",
-  "IRAQ2":               "Irak – Sanktionsprogram",
-  "IRAQ3":               "Irak – Executivorder 13438",
+  "BALKANS":             "VÃ¤stra Balkan â€“ Sanktionsprogram",
+  "BALKANS-EO14033":     "VÃ¤stra Balkan â€“ Executivorder 14033",
+  "BELARUS":             "Belarus â€“ Sanktionsprogram",
+  "BELARUS-EO14038":     "Belarus â€“ Executivorder 14038",
+  "BURMA-EO14014":       "Burma/Myanmar â€“ Executivorder 14014",
+  "CAATSA - IRAN":       "CAATSA â€“ Sanctions mot Iran",
+  "CAATSA - RUSSIA":     "CAATSA â€“ Countering America's Adversaries Through Sanctions Act (Ryssland)",
+  "CAR":                 "Centralafrikanska republiken â€“ Sanktionsprogram",
+  "CUBA":                "Kuba â€“ Sanktionsprogram",
+  "CYBER2":              "Cyberoperationer â€“ Executivorder 13694",
+  "CYBER3":              "Cyberoperationer â€“ Executivorder 13757",
+  "CYBER4":              "Cyberoperationer â€“ Executivorder 13983",
+  "DARFUR":              "Darfur/Sudan â€“ Sanktionsprogram",
+  "DPRK":                "Nordkorea â€“ Sanktionsprogram",
+  "DPRK2":               "Nordkorea â€“ Executivorder 13722",
+  "DPRK3":               "Nordkorea â€“ Executivorder 13810",
+  "DPRK4":               "Nordkorea â€“ Executivorder 13882",
+  "DRCONGO":             "Demokratiska republiken Kongo â€“ Sanktionsprogram",
+  "ELECTION-EO13848":    "Valintegritet â€“ Executivorder 13848",
+  "ETHIOPIA-EO14046":    "Etiopien â€“ Executivorder 14046",
+  "GLOMAG":              "Global Magnitsky â€“ MÃ¤nskliga rÃ¤ttigheter och korruption",
+  "HK-EO13936":          "Hongkong â€“ Executivorder 13936",
+  "HOSTAGES-EO14078":    "Gisslantagning â€“ Executivorder 14078",
+  "HRIT-IR":             "Iran â€“ Human Rights and Terrorism",
+  "HRIT-SY":             "Syrien â€“ Human Rights and Terrorism",
+  "ICC-EO14203":         "Internationella brottmÃ¥lsdomstolen â€“ Executivorder 14203",
+  "IFCA":                "Iran â€“ Freedom and Counter-Proliferation Act",
+  "IFSR":                "Iran â€“ Financial Sanctions Regulations",
+  "ILLICIT-DRUGS-EO14059": "Narkotikahandel â€“ Executivorder 14059",
+  "IRAN":                "Iran â€“ Sanktionsprogram",
+  "IRAN-CON-ARMS-EO":    "Iran â€“ Vapenembargo",
+  "IRAN-EO13846":        "Iran â€“ Executivorder 13846",
+  "IRAN-EO13876":        "Iran â€“ Executivorder 13876 (jÃ¤rn, stÃ¥l, aluminium)",
+  "IRAN-EO13902":        "Iran â€“ Executivorder 13902 (tillverkningssektorn)",
+  "IRAN-HR":             "Iran â€“ MÃ¤nskliga rÃ¤ttigheter",
+  "IRAN-TRA":            "Iran â€“ Threat Reduction and Syria Human Rights Act",
+  "IRAQ2":               "Irak â€“ Sanktionsprogram",
+  "IRAQ3":               "Irak â€“ Executivorder 13438",
   "IRGC":                "Islamiska revolutionsgardet (Iran)",
-  "LEBANON":             "Libanon – Sanktionsprogram",
-  "LIBYA2":              "Libyen – Executivorder 13726",
-  "LIBYA3":              "Libyen – Executivorder 13566",
-  "MAGNIT":              "Magnitsky Act – Ryssland",
-  "MALI-EO13882":        "Mali – Executivorder 13882",
-  "NICARAGUA":           "Nicaragua – Sanktionsprogram",
-  "NICARAGUA-NHRAA":     "Nicaragua – Human Rights and Anticorruption Act",
-  "NPWMD":               "Spridning av massförstörelsevapen",
-  "PAARSSR-EO13894":     "Syrien – Executivorder 13894",
-  "RUSSIA-EO14024":      "Ryssland – Executivorder 14024 (invasion av Ukraina)",
-  "RUSSIA-EO14065":      "Ryssland – Executivorder 14065 (Donetsk/Luhansk)",
+  "LEBANON":             "Libanon â€“ Sanktionsprogram",
+  "LIBYA2":              "Libyen â€“ Executivorder 13726",
+  "LIBYA3":              "Libyen â€“ Executivorder 13566",
+  "MAGNIT":              "Magnitsky Act â€“ Ryssland",
+  "MALI-EO13882":        "Mali â€“ Executivorder 13882",
+  "NICARAGUA":           "Nicaragua â€“ Sanktionsprogram",
+  "NICARAGUA-NHRAA":     "Nicaragua â€“ Human Rights and Anticorruption Act",
+  "NPWMD":               "Spridning av massfÃ¶rstÃ¶relsevapen",
+  "PAARSSR-EO13894":     "Syrien â€“ Executivorder 13894",
+  "RUSSIA-EO14024":      "Ryssland â€“ Executivorder 14024 (invasion av Ukraina)",
+  "RUSSIA-EO14065":      "Ryssland â€“ Executivorder 14065 (Donetsk/Luhansk)",
   "SDGT":                "Globalt utsedda terrorister",
   "SDNT":                "Narkotikahandlare",
-  "SDNTK":               "Narkotikahandlare – Kingpin Act",
-  "SOMALIA":             "Somalia – Sanktionsprogram",
-  "SOUTH SUDAN":         "Sydsudan – Sanktionsprogram",
-  "SSIDES":              "Sydsudan – Executivorder 13664",
-  "SUDAN-EO14098":       "Sudan – Executivorder 14098",
+  "SDNTK":               "Narkotikahandlare â€“ Kingpin Act",
+  "SOMALIA":             "Somalia â€“ Sanktionsprogram",
+  "SOUTH SUDAN":         "Sydsudan â€“ Sanktionsprogram",
+  "SSIDES":              "Sydsudan â€“ Executivorder 13664",
+  "SUDAN-EO14098":       "Sudan â€“ Executivorder 14098",
   "TCO":                 "Transnationella kriminella organisationer",
-  "UKRAINE-EO13660":     "Ukraina – Executivorder 13660",
-  "UKRAINE-EO13661":     "Ukraina – Executivorder 13661",
-  "UKRAINE-EO13662":     "Ukraina – Executivorder 13662",
-  "UKRAINE-EO13685":     "Ukraina/Krim – Executivorder 13685",
-  "VENEZUELA":           "Venezuela – Sanktionsprogram",
-  "VENEZUELA-EO13850":   "Venezuela – Executivorder 13850",
-  "VENEZUELA-EO13884":   "Venezuela – Executivorder 13884",
-  "YEMEN":               "Jemen – Sanktionsprogram",
+  "UKRAINE-EO13660":     "Ukraina â€“ Executivorder 13660",
+  "UKRAINE-EO13661":     "Ukraina â€“ Executivorder 13661",
+  "UKRAINE-EO13662":     "Ukraina â€“ Executivorder 13662",
+  "UKRAINE-EO13685":     "Ukraina/Krim â€“ Executivorder 13685",
+  "VENEZUELA":           "Venezuela â€“ Sanktionsprogram",
+  "VENEZUELA-EO13850":   "Venezuela â€“ Executivorder 13850",
+  "VENEZUELA-EO13884":   "Venezuela â€“ Executivorder 13884",
+  "YEMEN":               "Jemen â€“ Sanktionsprogram",
   "UHRPA":               "Uyghur Human Rights Policy Act",
-  "NS-PLC":              "Palestinska myndigheten – National Security",
-  "PEESA-EO14039":       "Ryssland – Protecting Europe's Energy Security Act",
+  "NS-PLC":              "Palestinska myndigheten â€“ National Security",
+  "PEESA-EO14039":       "Ryssland â€“ Protecting Europe's Energy Security Act",
 };
 
 // OFAC kombinerar ibland flera program: "SDGT] [IRGC] [IFSR"
-// Parsa ut alla delkoder och slå upp var och en
+// Parsa ut alla delkoder och slÃ¥ upp var och en
 const parseProgramCodes = (program) => {
   if (!program) return [];
-  // Splitta på "] [" och rensa bort hakparenteser
+  // Splitta pÃ¥ "] [" och rensa bort hakparenteser
   return program.split(/\]\s*\[/).map(s => s.replace(/[\[\]]/g, "").trim()).filter(Boolean);
 };
 
@@ -359,12 +359,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Hämta snapshots för dropdown
+    // HÃ¤mta snapshots fÃ¶r dropdown
     fetch("/.netlify/functions/sanctions?action=snapshots")
       .then(r => r.json())
       .then(data => setSnapshots(data.snapshots || []))
       .catch(() => {});
-    // Hämta senaste listan
+    // HÃ¤mta senaste listan
     loadList(null);
   }, []);
 
@@ -397,20 +397,20 @@ export default function App() {
     setAiLoading(true);
     setAiAnalysis(null);
     const topHits = results.filter(r => r.scores.combined >= 50).slice(0, 5);
-    const prompt = `Du är en expert på sanktionsscreening för en europeisk bank.
+    const prompt = `Du Ã¤r en expert pÃ¥ sanktionsscreening fÃ¶r en europeisk bank.
 
 En kund med namnet "${query}" har screenats mot sanktionslistor (${sourceFilter === "all" ? "OFAC, EU och FN" : sourceFilter === "UN" ? "FN" : sourceFilter}).
 
 ALGORITMISKA RESULTAT:
-${topHits.map(r => `- ${r.name} (${r.nationality || r.country || "okänt land"}, ${r.program}) — score: ${r.scores.combined}/100, matchad mot: "${r.matchedName}"`).join("\n")}
+${topHits.map(r => `- ${r.name} (${r.nationality || r.country || "okÃ¤nt land"}, ${r.program}) â€” score: ${r.scores.combined}/100, matchad mot: "${r.matchedName}"`).join("\n")}
 
-Gör en professionell bedömning:
-1. Är "${query}" sannolikt samma person som någon på listan?
-2. Ta hänsyn till namnvarianter, kulturella konventioner, translitterering.
-3. Rekommendera: BLOCKERA / MANUELL GRANSKNING / GODKÄNN
+GÃ¶r en professionell bedÃ¶mning:
+1. Ã„r "${query}" sannolikt samma person som nÃ¥gon pÃ¥ listan?
+2. Ta hÃ¤nsyn till namnvarianter, kulturella konventioner, translitterering.
+3. Rekommendera: BLOCKERA / MANUELL GRANSKNING / GODKÃ„NN
 4. Kort motivering.
 
-Svara på svenska, koncist.`;
+Svara pÃ¥ svenska, koncist.`;
 
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -439,13 +439,13 @@ Svara på svenska, koncist.`;
     (sourceFilter === "all" || r.source === sourceFilter)
   );
 
-  // Gruppera träffar med samma namn
+  // Gruppera trÃ¤ffar med samma namn
   const groupedMap = new Map();
   for (const r of filtered) {
     const key = normalize(r.name);
     if (!groupedMap.has(key)) groupedMap.set(key, { name: r.name, bySource: {} });
     const group = groupedMap.get(key);
-    // Behåll bara bästa träff per källa
+    // BehÃ¥ll bara bÃ¤sta trÃ¤ff per kÃ¤lla
     if (!group.bySource[r.source] || r.scores.combined > group.bySource[r.source].scores.combined) {
       group.bySource[r.source] = r;
     }
@@ -483,19 +483,19 @@ Svara på svenska, koncist.`;
 
       {/* Header */}
       <div style={{ background: "#1e3a5f", padding: "14px 32px", display: "flex", alignItems: "center", gap: 16 }}>
-        <span style={{ fontSize: 20 }}>🛡</span>
+        <span style={{ fontSize: 20 }}>ðŸ›¡</span>
         <div>
           <div style={{ color: "#fff", fontSize: 16, fontWeight: 700 }}>Sanctions Screening</div>
           <div style={{ color: "#93c5fd", fontSize: 12 }}>
             {listLoading
               ? "Laddar sanktionslistor..."
               : listError
-              ? `⚠ Fel vid laddning: ${listError}`
+              ? `âš  Fel vid laddning: ${listError}`
               : (() => {
                   const ofac = sanctionsList.filter(e => e.source === "OFAC").length;
                   const eu   = sanctionsList.filter(e => e.source === "EU").length;
                   const un   = sanctionsList.filter(e => e.source === "UN").length;
-                  return `${sanctionsList.length.toLocaleString("sv-SE")} entiteter · OFAC ${ofac.toLocaleString("sv-SE")} · EU ${eu.toLocaleString("sv-SE")} · FN ${un.toLocaleString("sv-SE")} · 5 algoritmer · Infotrek AI`;
+                  return `${sanctionsList.length.toLocaleString("sv-SE")} entiteter Â· OFAC ${ofac.toLocaleString("sv-SE")} Â· EU ${eu.toLocaleString("sv-SE")} Â· FN ${un.toLocaleString("sv-SE")} Â· 5 algoritmer Â· Infotrek AI`;
                 })()
             }
           </div>
@@ -541,23 +541,23 @@ Svara på svenska, koncist.`;
             ))}
           </div>
 
-          {/* ── Konfigurationspanel ─────────────────────────────────────── */}
+          {/* â”€â”€ Konfigurationspanel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div style={{ background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 12, marginBottom: 20, overflow: "hidden" }}>
 
             {/* Panel header */}
             <div style={{ padding: "12px 18px", background: "#f1f5f9", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", letterSpacing: 0.8 }}>⚙ SCREENINGKONFIGURATION</span>
-              <span style={{ fontSize: 11, color: "#94a3b8" }}>Inställningarna påverkar alla sökningar</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", letterSpacing: 0.8 }}>âš™ SCREENINGKONFIGURATION</span>
+              <span style={{ fontSize: 11, color: "#94a3b8" }}>InstÃ¤llningarna pÃ¥verkar alla sÃ¶kningar</span>
             </div>
 
             <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 16 }}>
 
-              {/* Rad 1: Källa + Entitet */}
+              {/* Rad 1: KÃ¤lla + Entitet */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
-                {/* Källa */}
+                {/* KÃ¤lla */}
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>KÄLLA</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>KÃ„LLA</div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                     {[
                       { value: "all",  label: "Alla",  count: sanctionsList.length },
@@ -615,19 +615,19 @@ Svara på svenska, koncist.`;
                 </div>
               </div>
 
-              {/* Rad 2: Tröskel + Snapshot */}
+              {/* Rad 2: TrÃ¶skel + Snapshot */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
-                {/* Tröskel */}
+                {/* TrÃ¶skel */}
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>MATCHNINGSTRÖSKEL</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>MATCHNINGSTRÃ–SKEL</div>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <input type="range" min={30} max={95} value={threshold}
                       onChange={e => setThreshold(+e.target.value)}
                       style={{ flex: 1, accentColor: "#1e3a5f" }} />
                     <span style={{ fontSize: 15, fontWeight: 700, color: "#1e3a5f", minWidth: 38 }}>{threshold}%</span>
                     <span style={{ fontSize: 11, color: "#94a3b8", minWidth: 80 }}>
-                      {threshold >= 85 ? "Strikt" : threshold >= 70 ? "Balanserad" : "Känslig"}
+                      {threshold >= 85 ? "Strikt" : threshold >= 70 ? "Balanserad" : "KÃ¤nslig"}
                     </span>
                   </div>
                 </div>
@@ -652,10 +652,10 @@ Svara på svenska, koncist.`;
                     <option value="latest">Senaste (aktuell)</option>
                     {snapshots.length > 0 && (
                       <>
-                        <option disabled>──────────────</option>
+                        <option disabled>â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€</option>
                         {snapshots.map(s => (
                           <option key={s.id} value={s.snapshot_date}>
-                            {s.source} – {s.snapshot_date} ({s.entity_count.toLocaleString("sv-SE")} entiteter)
+                            {s.source} â€“ {s.snapshot_date} ({s.entity_count.toLocaleString("sv-SE")} entiteter)
                           </option>
                         ))}
                       </>
@@ -663,7 +663,7 @@ Svara på svenska, koncist.`;
                   </select>
                   {selectedSnapshot !== "latest" && (
                     <div style={{ fontSize: 10, color: "#f59e0b", marginTop: 4 }}>
-                      ⚠ Screenar mot historisk lista från {selectedSnapshot}
+                      âš  Screenar mot historisk lista frÃ¥n {selectedSnapshot}
                     </div>
                   )}
                 </div>
@@ -678,7 +678,7 @@ Svara på svenska, koncist.`;
                 }}>
                   ALGORITMER & VIKTER
                   <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 400 }}>({activeCount}/5 aktiva)</span>
-                  <span style={{ fontSize: 10 }}>{showConfig ? "▲" : "▼"}</span>
+                  <span style={{ fontSize: 10 }}>{showConfig ? "â–²" : "â–¼"}</span>
                 </button>
 
                 {showConfig && (
@@ -691,20 +691,20 @@ Svara på svenska, koncist.`;
                     .algo-pct { width: 44px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
                   `}</style>
                   <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", letterSpacing: 1, marginBottom: 12 }}>
-                    VÄLJ ALGORITMER OCH VIKTER — vikterna normaliseras automatiskt
+                    VÃ„LJ ALGORITMER OCH VIKTER â€” vikterna normaliseras automatiskt
                   </div>
                   {(() => {
                     const algos = [
                       { key: "jw",  valKey: "jwVal",  label: "Jaro-Winkler",     desc: "Teckenbaserad likhet",         color: "#3b82f6",
-                        tooltip: "Mäter likhet baserat på gemensamma tecken och transpositioner. Ger extra poäng för matchande prefix. Bra för stavvarianter som 'Erik' vs 'Eric'." },
-                      { key: "ts",  valKey: "tsVal",  label: "Token-sort",        desc: "Ordningsokänslig jämförelse",  color: "#10b981",
-                        tooltip: "Delar upp namnet i tokens (ord), sorterar dem alfabetiskt och jämför sedan. Gör att 'Ali Hassan' och 'Hassan Ali' får högt score oavsett ordning." },
-                      { key: "lev", valKey: "levVal", label: "Levenshtein",       desc: "Edit-avstånd",                 color: "#f59e0b",
-                        tooltip: "Räknar minimalt antal insättningar, borttagningar och ersättningar för att omvandla ett namn till ett annat. 'Mohammed' vs 'Mohammad' = avstånd 2." },
-                      { key: "ngr", valKey: "ngrVal", label: "N-gram (trigram)",  desc: "Delsträcksöverlapp",           color: "#8b5cf6",
-                        tooltip: "Delar upp namn i överlappande 3-teckensblock (trigrams) och mäter andelen gemensamma block. Robust mot längre namnvarianter och translitterering." },
+                        tooltip: "MÃ¤ter likhet baserat pÃ¥ gemensamma tecken och transpositioner. Ger extra poÃ¤ng fÃ¶r matchande prefix. Bra fÃ¶r stavvarianter som 'Erik' vs 'Eric'." },
+                      { key: "ts",  valKey: "tsVal",  label: "Token-sort",        desc: "OrdningsokÃ¤nslig jÃ¤mfÃ¶relse",  color: "#10b981",
+                        tooltip: "Delar upp namnet i tokens (ord), sorterar dem alfabetiskt och jÃ¤mfÃ¶r sedan. GÃ¶r att 'Ali Hassan' och 'Hassan Ali' fÃ¥r hÃ¶gt score oavsett ordning." },
+                      { key: "lev", valKey: "levVal", label: "Levenshtein",       desc: "Edit-avstÃ¥nd",                 color: "#f59e0b",
+                        tooltip: "RÃ¤knar minimalt antal insÃ¤ttningar, borttagningar och ersÃ¤ttningar fÃ¶r att omvandla ett namn till ett annat. 'Mohammed' vs 'Mohammad' = avstÃ¥nd 2." },
+                      { key: "ngr", valKey: "ngrVal", label: "N-gram (trigram)",  desc: "DelstrÃ¤cksÃ¶verlapp",           color: "#8b5cf6",
+                        tooltip: "Delar upp namn i Ã¶verlappande 3-teckensblock (trigrams) och mÃ¤ter andelen gemensamma block. Robust mot lÃ¤ngre namnvarianter och translitterering." },
                       { key: "mph", valKey: "mphVal", label: "Double Metaphone",  desc: "Fonetisk likhet",              color: "#ec4899",
-                        tooltip: "Kodar namnet fonetiskt – hur det låter snarare än hur det stavas. 'Vladimir' och 'Wladimir' får samma kod. Speciellt bra för arabiska och slaviska namn." },
+                        tooltip: "Kodar namnet fonetiskt â€“ hur det lÃ¥ter snarare Ã¤n hur det stavas. 'Vladimir' och 'Wladimir' fÃ¥r samma kod. Speciellt bra fÃ¶r arabiska och slaviska namn." },
                     ];
                     const totalWeight = algos.reduce((sum, a) => sum + (weights[a.key] ? weights[a.valKey] : 0), 0);
                     return algos.map(({ key, valKey, label, desc, color, tooltip }) => {
@@ -747,7 +747,7 @@ Svara på svenska, koncist.`;
                     });
                   })()}
                     <div style={{ marginTop: 10, fontSize: 12, color: "#9ca3af", borderTop: "1px solid #e5e7eb", paddingTop: 10 }}>
-                      Kombinerat score = viktat medelvärde av aktiva algoritmer (normaliserat till 100%)
+                      Kombinerat score = viktat medelvÃ¤rde av aktiva algoritmer (normaliserat till 100%)
                     </div>
                   </div>
                 )}
@@ -760,10 +760,10 @@ Svara på svenska, koncist.`;
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
               <div style={{ fontSize: 14, color: "#6b7280" }}>
-                <span style={{ fontWeight: 600, color: "#111827" }}>{grouped.length}</span> träffar över {threshold}%
+                <span style={{ fontWeight: 600, color: "#111827" }}>{grouped.length}</span> trÃ¤ffar Ã¶ver {threshold}%
                 {grouped.length !== filtered.length && <span style={{ color: "#9ca3af", fontSize: 12 }}> ({filtered.length} totalt inkl. dubbletter)</span>}
-                {topScore >= 90 && <span style={{ marginLeft: 14, color: "#dc2626", fontWeight: 600 }}>⚠ Möjlig match hittad</span>}
-                {topScore < 70 && grouped.length > 0 && <span style={{ marginLeft: 14, color: "#16a34a", fontWeight: 500 }}>✓ Inga starka träffar</span>}
+                {topScore >= 90 && <span style={{ marginLeft: 14, color: "#dc2626", fontWeight: 600 }}>âš  MÃ¶jlig match hittad</span>}
+                {topScore < 70 && grouped.length > 0 && <span style={{ marginLeft: 14, color: "#16a34a", fontWeight: 500 }}>âœ“ Inga starka trÃ¤ffar</span>}
               </div>
               {filtered.some(r => r.scores.combined >= 50) && (
                 <button onClick={runAiAnalysis} disabled={aiLoading} style={{
@@ -776,7 +776,7 @@ Svara på svenska, koncist.`;
                 }}>
                   {aiLoading
                     ? <><span style={{ width: 13, height: 13, border: "2px solid #d1d5db", borderTop: "2px solid #6b7280", borderRadius: "50%", display: "inline-block", animation: "spin 0.8s linear infinite" }} /> Analyserar...</>
-                    : "✦ AI-bedömning"}
+                    : "âœ¦ AI-bedÃ¶mning"}
                 </button>
               )}
             </div>
@@ -784,8 +784,8 @@ Svara på svenska, koncist.`;
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
               {filtered.length === 0 && (
                 <div style={{ background: "#fff", borderRadius: 10, padding: "48px", textAlign: "center", color: "#6b7280", fontSize: 14, border: "1px solid #e5e7eb" }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>✓</div>
-                  Inga träffar över {threshold}% — kunden finns inte på {sourceFilter === "all" ? "någon sanktionslista" : sourceFilter === "UN" ? "FN:s sanktionslista" : `${sourceFilter}:s sanktionslista`}
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>âœ“</div>
+                  Inga trÃ¤ffar Ã¶ver {threshold}% â€” kunden finns inte pÃ¥ {sourceFilter === "all" ? "nÃ¥gon sanktionslista" : sourceFilter === "UN" ? "FN:s sanktionslista" : `${sourceFilter}:s sanktionslista`}
                 </div>
               )}
               {grouped.map((group, i) => {
@@ -822,7 +822,7 @@ Svara på svenska, koncist.`;
                             }}>{r.type === "organization" ? "org" : r.type}</span>
                           )}
                         </div>
-                        {/* Klickbara källbadges */}
+                        {/* Klickbara kÃ¤llbadges */}
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                           {group.hits.map(h => {
                             const isActive = h.source === (activeSource[group.key] || group.hits[0].source);
@@ -843,7 +843,7 @@ Svara på svenska, koncist.`;
                                   textTransform: "uppercase", letterSpacing: 0.5, cursor: "pointer",
                                   transition: "all 0.15s"
                                 }}
-                                title={`Visa detaljer från ${sourceLabel}`}
+                                title={`Visa detaljer frÃ¥n ${sourceLabel}`}
                               >{sourceLabel} {h.scores.combined}</span>
                             );
                           })}
@@ -853,7 +853,7 @@ Svara på svenska, koncist.`;
                       {/* Flag */}
                       <div style={{ textAlign: "center", flexShrink: 0, minWidth: 36 }}>
                         <div style={{ fontSize: 22 }}>{flagEmoji(r.nationality || r.country)}</div>
-                        <div style={{ fontSize: 11, color: "#9ca3af" }}>{r.nationality || r.country || "—"}</div>
+                        <div style={{ fontSize: 11, color: "#9ca3af" }}>{r.nationality || r.country || "â€”"}</div>
                       </div>
 
                       {/* Risk badge */}
@@ -863,16 +863,16 @@ Svara på svenska, koncist.`;
                       }}>{risk.label}</span>
 
                       {/* Chevron */}
-                      <span style={{ color: "#9ca3af", fontSize: 16, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>▼</span>
+                      <span style={{ color: "#9ca3af", fontSize: 16, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>â–¼</span>
                     </div>
 
                     {isOpen && (
                       <div style={{ padding: "16px 18px 20px", borderTop: `1px solid ${risk.border}`, background: "#fff" }}>
 
-                        {/* Källindikator */}
+                        {/* KÃ¤llindikator */}
                         <div style={{ marginBottom: 14, fontSize: 12, color: "#6b7280" }}>
-                          Visar data från: <strong style={{ color: "#1e3a5f" }}>{r.source === "UN" ? "FN" : r.source}</strong>
-                          {group.hits.length > 1 && <span style={{ marginLeft: 6, color: "#9ca3af" }}>— klicka på källbadge ovan för att byta</span>}
+                          Visar data frÃ¥n: <strong style={{ color: "#1e3a5f" }}>{r.source === "UN" ? "FN" : r.source}</strong>
+                          {group.hits.length > 1 && <span style={{ marginLeft: 6, color: "#9ca3af" }}>â€” klicka pÃ¥ kÃ¤llbadge ovan fÃ¶r att byta</span>}
                         </div>
 
                         {/* Program description */}
@@ -888,12 +888,12 @@ Svara på svenska, koncist.`;
                           <div>
                             <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 10 }}>PERSONUPPGIFTER</div>
                             {[
-                              ["Fullständigt namn", r.name],
+                              ["FullstÃ¤ndigt namn", r.name],
                               ["Typ", r.type ? r.type.charAt(0).toUpperCase() + r.type.slice(1) : null],
                               ["Titel", r.title],
-                              ["Kön", r.gender === "Male" ? "Man" : r.gender === "Female" ? "Kvinna" : null],
-                              ["Födelsedatum", r.dob],
-                              ["Födelseort", r.pob],
+                              ["KÃ¶n", r.gender === "Male" ? "Man" : r.gender === "Female" ? "Kvinna" : null],
+                              ["FÃ¶delsedatum", r.dob],
+                              ["FÃ¶delseort", r.pob],
                               ["Nationalitet", r.nationality],
                               ["Matchad mot", `"${r.matchedName}"`],
                               [r.source === "OFAC" ? "OFAC ID" : r.source === "EU" ? "EU Ref" : "FN Ref", r.id],
@@ -919,7 +919,7 @@ Svara på svenska, koncist.`;
                               <div style={{ marginBottom: 14 }}>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>ADRESSER</div>
                                 {r.addresses.map((a, i) => (
-                                  <div key={i} style={{ fontSize: 13, color: "#374151", padding: "3px 0", borderBottom: "1px solid #f3f4f6" }}>📍 {a}</div>
+                                  <div key={i} style={{ fontSize: 13, color: "#374151", padding: "3px 0", borderBottom: "1px solid #f3f4f6" }}>ðŸ“ {a}</div>
                                 ))}
                               </div>
                             )}
@@ -927,7 +927,7 @@ Svara på svenska, koncist.`;
                               <div style={{ marginBottom: 14 }}>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>PASS</div>
                                 {r.passports.map((p, i) => (
-                                  <div key={i} style={{ fontSize: 13, color: "#374151" }}>🛂 {p.number} ({p.country})</div>
+                                  <div key={i} style={{ fontSize: 13, color: "#374151" }}>ðŸ›‚ {p.number} ({p.country})</div>
                                 ))}
                               </div>
                             )}
@@ -935,7 +935,7 @@ Svara på svenska, koncist.`;
                               <div>
                                 <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>ID-NUMMER</div>
                                 {r.national_ids.map((n, i) => (
-                                  <div key={i} style={{ fontSize: 13, color: "#374151" }}>🪪 {n.number}{n.country ? ` (${n.country})` : ""}</div>
+                                  <div key={i} style={{ fontSize: 13, color: "#374151" }}>ðŸªª {n.number}{n.country ? ` (${n.country})` : ""}</div>
                                 ))}
                               </div>
                             )}
@@ -945,11 +945,11 @@ Svara på svenska, koncist.`;
                         {/* Score bars */}
                         <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 16 }}>
                           <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 12 }}>MATCHNINGSSCORES</div>
-                          <ScoreBar label="Jaro-Winkler  –  teckenbaserad likhet" value={r.scores.jaroWinkler} color="#3b82f6" />
-                          <ScoreBar label="Token-sort  –  ordningsokänslig jämförelse" value={r.scores.tokenSort} color="#10b981" />
-                          <ScoreBar label="Levenshtein  –  edit-avstånd" value={r.scores.levenshtein} color="#f59e0b" />
-                          <ScoreBar label="N-gram (trigram)  –  delsträcksöverlapp" value={r.scores.ngram} color="#8b5cf6" />
-                          <ScoreBar label="Double Metaphone  –  fonetisk likhet" value={r.scores.metaphone} color="#ec4899" />
+                          <ScoreBar label="Jaro-Winkler  â€“  teckenbaserad likhet" value={r.scores.jaroWinkler} color="#3b82f6" />
+                          <ScoreBar label="Token-sort  â€“  ordningsokÃ¤nslig jÃ¤mfÃ¶relse" value={r.scores.tokenSort} color="#10b981" />
+                          <ScoreBar label="Levenshtein  â€“  edit-avstÃ¥nd" value={r.scores.levenshtein} color="#f59e0b" />
+                          <ScoreBar label="N-gram (trigram)  â€“  delstrÃ¤cksÃ¶verlapp" value={r.scores.ngram} color="#8b5cf6" />
+                          <ScoreBar label="Double Metaphone  â€“  fonetisk likhet" value={r.scores.metaphone} color="#ec4899" />
                           <div style={{ marginTop: 8, fontSize: 12, color: "#9ca3af" }}>
                             {(() => {
                               const algos = [
@@ -964,7 +964,7 @@ Svara på svenska, koncist.`;
                               if (active.length === 0) return "Inga algoritmer aktiva";
                               const parts = active.map(a => {
                                 const pct = Math.round((weights[a.valKey] / total) * 100);
-                                return `${a.label}×${pct}%`;
+                                return `${a.label}Ã—${pct}%`;
                               }).join(" + ");
                               return `Kombinerat = ${parts}`;
                             })()}
@@ -980,7 +980,7 @@ Svara på svenska, koncist.`;
             {/* AI panel */}
             {aiAnalysis && (
               <div style={{ background: "#fff", border: "1.5px solid #bfdbfe", borderRadius: 10, padding: "22px 24px", animation: "fadeIn 0.3s ease" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#1e3a5f", marginBottom: 12 }}>✦ AI-bedömning — Infotrek AI</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1e3a5f", marginBottom: 12 }}>âœ¦ AI-bedÃ¶mning â€” Infotrek AI</div>
                 <div style={{ fontSize: 14, lineHeight: 1.8, color: "#374151", whiteSpace: "pre-wrap" }}>{aiAnalysis}</div>
               </div>
             )}
@@ -989,8 +989,8 @@ Svara på svenska, koncist.`;
 
         {!hasSearched && (
           <div style={{ background: "#fff", borderRadius: 12, padding: "56px", textAlign: "center", border: "1px solid #e5e7eb" }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>🛡</div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Ange ett namn för att screena</div>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>ðŸ›¡</div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Ange ett namn fÃ¶r att screena</div>
             <div style={{ fontSize: 13, color: "#9ca3af" }}>
               {listLoading
                 ? "Laddar sanktionslistor..."
@@ -998,7 +998,7 @@ Svara på svenska, koncist.`;
                     const ofac = sanctionsList.filter(e => e.source === "OFAC").length;
                     const eu   = sanctionsList.filter(e => e.source === "EU").length;
                     const un   = sanctionsList.filter(e => e.source === "UN").length;
-                    return `Jämförs mot ${sanctionsList.length.toLocaleString("sv-SE")} entiteter · OFAC ${ofac.toLocaleString("sv-SE")} · EU ${eu.toLocaleString("sv-SE")} · FN ${un.toLocaleString("sv-SE")} · 5 matchningsalgoritmer + Infotrek AI`;
+                    return `JÃ¤mfÃ¶rs mot ${sanctionsList.length.toLocaleString("sv-SE")} entiteter Â· OFAC ${ofac.toLocaleString("sv-SE")} Â· EU ${eu.toLocaleString("sv-SE")} Â· FN ${un.toLocaleString("sv-SE")} Â· 5 matchningsalgoritmer + Infotrek AI`;
                   })()}
             </div>
           </div>
