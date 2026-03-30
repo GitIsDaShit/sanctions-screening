@@ -262,7 +262,7 @@ function ListManagement() {
       setUpdateMsg("Fetching " + source + " from source...");
 
       // Trigger background function
-      await fetch("/.netlify/functions/update-sanctions", {
+      await fetch("/.netlify/functions/update-sanctions-background", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source, jobId }),
