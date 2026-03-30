@@ -175,7 +175,7 @@ const getRisk = (score) => {
   if (score >= 50) return { label: "WEAK",    bg: "#f9fafb", border: "#d1d5db", badge: "#6b7280", scoreColor: "#6b7280" };
   return             { label: "OK",         bg: "#f9fafb", border: "#e5e7eb", badge: "#9ca3af", scoreColor: "#9ca3af" };
 };
-const flagEmoji = (c) => ({ RU:"\ud83c\uddf7\ud83c\uddfa",KP:"\ud83c\uddf0\ud83c\uddf5",BY:"\ud83c\udde7\ud83c\uddfe",SY:"\ud83c\uddf8\ud83c\uddfe",IR:"\ud83c\uddee\ud83c\uddf7",IQ:"\ud83c\uddee\ud83c\uddf6",CO:"\ud83c\udde8\ud83c\uddf4",LY:"\ud83c\uddf1\ud83c\uddfe",SD:"\ud83c\uddf8\ud83c\udde9" }[c] || "\ud83c\udf0d");
+const flagEmoji = (c) => ({ RU:"🇷🇺",KP:"🇰🇵",BY:"🇧🇾",SY:"🇸🇾",IR:"🇮🇷",IQ:"🇮🇶",CO:"🇨🇴",LY:"🇱🇾",SD:"🇸🇩" }[c] || "🌍");
 
 const PROGRAM_NAMES = {
   "BALKANS":"Western Balkans","BALKANS-EO14033":"Western Balkans EO14033","BELARUS":"Belarus",
@@ -439,7 +439,7 @@ function ListManagement() {
                               <div style={{ fontSize: 11, color: "#6b7280", marginTop: 2 }}>
                                 <span style={{ fontWeight: 600 }}>{row.field_changed}:</span>{" "}
                                 <span style={{ textDecoration: "line-through", color: "#9ca3af" }}>{row.old_value}</span>
-                                {" \u2192 "}
+                                {" → "}
                                 <span style={{ color: "#111827" }}>{row.new_value}</span>
                               </div>
                             )}
@@ -614,7 +614,7 @@ function SanctionsScreening() {
         {/* Config panel */}
         <div style={{ background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: 12, overflow: "hidden" }}>
           <div style={{ padding: "12px 18px", background: "#f1f5f9", borderBottom: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", letterSpacing: 0.8 }}>\u2699 SCREENING CONFIGURATION</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", letterSpacing: 0.8 }}>⚙ SCREENING CONFIGURATION</span>
             <span style={{ fontSize: 11, color: "#94a3b8" }}>Settings apply to all searches</span>
           </div>
           <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -709,7 +709,7 @@ function SanctionsScreening() {
               <button onClick={() => setShowConfig(v => !v)} style={{ background: "none", border: "1.5px solid #e2e8f0", borderRadius: 6, padding: "6px 12px", fontSize: 11, color: "#64748b", cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
                 ALGORITHMS &amp; WEIGHTS
                 <span style={{ fontSize: 10, color: "#94a3b8", fontWeight: 400 }}>({activeCount}/5 active)</span>
-                <span style={{ fontSize: 10 }}>{showConfig ? "\u25b2" : "\u25bc"}</span>
+                <span style={{ fontSize: 10 }}>{showConfig ? "▲" : "▼"}</span>
               </button>
               {showConfig && (
                 <div style={{ marginTop: 10, padding: 14, background: "#fff", borderRadius: 8, border: "1px solid #e2e8f0" }}>
@@ -772,7 +772,7 @@ function SanctionsScreening() {
                 cursor: aiLoading ? "not-allowed" : "pointer",
                 fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8
               }}>
-                {aiLoading ? <><Spinner size={13} color="#6b7280" /> Analyzing...</> : "\u2726 AI Assessment"}
+                {aiLoading ? <><Spinner size={13} color="#6b7280" /> Analyzing...</> : "✦ AI Assessment"}
               </button>
             )}
           </div>
@@ -818,16 +818,16 @@ function SanctionsScreening() {
                     </div>
                     <div style={{ textAlign: "center", flexShrink: 0, minWidth: 36 }}>
                       <div style={{ fontSize: 22 }}>{flagEmoji(r.nationality || r.country)}</div>
-                      <div style={{ fontSize: 11, color: "#9ca3af" }}>{r.nationality || r.country || "\u2014"}</div>
+                      <div style={{ fontSize: 11, color: "#9ca3af" }}>{r.nationality || r.country || "—"}</div>
                     </div>
                     <span style={{ padding: "5px 13px", borderRadius: 20, background: risk.badge, color: "#fff", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{risk.label}</span>
-                    <span style={{ color: "#9ca3af", fontSize: 16, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>\u25bc</span>
+                    <span style={{ color: "#9ca3af", fontSize: 16, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s", flexShrink: 0 }}>▼</span>
                   </div>
                   {isOpen && (
                     <div style={{ padding: "16px 18px 20px", borderTop: "1px solid " + risk.border, background: "#fff" }}>
                       <div style={{ marginBottom: 14, fontSize: 12, color: "#6b7280" }}>
                         Showing data from: <strong style={{ color: "#1e3a5f" }}>{r.source}</strong>
-                        {group.hits.length > 1 && <span style={{ marginLeft: 6, color: "#9ca3af" }}>\u2014 click source badge above to switch</span>}
+                        {group.hits.length > 1 && <span style={{ marginLeft: 6, color: "#9ca3af" }}>— click source badge above to switch</span>}
                       </div>
                       {programDesc && (
                         <div style={{ marginBottom: 16, padding: "10px 14px", background: "#f0f7ff", borderRadius: 6, fontSize: 13, color: "#1e3a5f" }}>
@@ -860,19 +860,19 @@ function SanctionsScreening() {
                           {r.addresses?.length > 0 && (
                             <div style={{ marginBottom: 14 }}>
                               <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>ADDRESSES</div>
-                              {r.addresses.map((a, i) => <div key={i} style={{ fontSize: 13, color: "#374151", padding: "3px 0", borderBottom: "1px solid #f3f4f6" }}>\ud83d\udccd {a}</div>)}
+                              {r.addresses.map((a, i) => <div key={i} style={{ fontSize: 13, color: "#374151", padding: "3px 0", borderBottom: "1px solid #f3f4f6" }}>📍 {a}</div>)}
                             </div>
                           )}
                           {r.passports?.length > 0 && (
                             <div style={{ marginBottom: 14 }}>
                               <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>PASSPORTS</div>
-                              {r.passports.map((p, i) => <div key={i} style={{ fontSize: 13, color: "#374151" }}>\ud83d\udec2 {p.number} ({p.country})</div>)}
+                              {r.passports.map((p, i) => <div key={i} style={{ fontSize: 13, color: "#374151" }}>🛂 {p.number} ({p.country})</div>)}
                             </div>
                           )}
                           {r.national_ids?.length > 0 && (
                             <div>
                               <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>ID NUMBERS</div>
-                              {r.national_ids.map((n, i) => <div key={i} style={{ fontSize: 13, color: "#374151" }}>\ud83e\udeb2 {n.number}{n.country ? " (" + n.country + ")" : ""}</div>)}
+                              {r.national_ids.map((n, i) => <div key={i} style={{ fontSize: 13, color: "#374151" }}>🪲 {n.number}{n.country ? " (" + n.country + ")" : ""}</div>)}
                             </div>
                           )}
                         </div>
@@ -893,7 +893,7 @@ function SanctionsScreening() {
           </div>
           {aiAnalysis && (
             <div style={{ background: "#fff", border: "1.5px solid #bfdbfe", borderRadius: 10, padding: "22px 24px", animation: "fadeIn 0.3s ease" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#1e3a5f", marginBottom: 12 }}>\u2726 AI Assessment \u2014 Infotrek AI</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#1e3a5f", marginBottom: 12 }}>✦ AI Assessment — Infotrek AI</div>
               <div style={{ fontSize: 14, lineHeight: 1.8, color: "#374151", whiteSpace: "pre-wrap" }}>{aiAnalysis}</div>
             </div>
           )}
@@ -902,14 +902,14 @@ function SanctionsScreening() {
 
       {!hasSearched && (
         <div style={{ background: "#fff", borderRadius: 12, padding: "56px", textAlign: "center", border: "1px solid #e5e7eb" }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>\ud83d\udee1</div>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🛡</div>
           <div style={{ fontSize: 16, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Enter a name to screen</div>
           <div style={{ fontSize: 13, color: "#9ca3af" }}>
             {listLoading ? "Loading sanctions lists..." : (() => {
               const ofac = sanctionsList.filter(e => e.source === "OFAC").length;
               const eu = sanctionsList.filter(e => e.source === "EU").length;
               const un = sanctionsList.filter(e => e.source === "UN").length;
-              return "Screening against " + sanctionsList.length.toLocaleString("en-US") + " entities \u00b7 OFAC " + ofac.toLocaleString("en-US") + " \u00b7 EU " + eu.toLocaleString("en-US") + " \u00b7 UN " + un.toLocaleString("en-US") + " \u00b7 5 algorithms + Infotrek AI";
+              return "Screening against " + sanctionsList.length.toLocaleString("en-US") + " entities · OFAC " + ofac.toLocaleString("en-US") + " · EU " + eu.toLocaleString("en-US") + " · UN " + un.toLocaleString("en-US") + " · 5 algorithms + Infotrek AI";
             })()}
           </div>
         </div>
@@ -937,7 +937,7 @@ export default function App() {
         <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           {/* Logo */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 0" }}>
-            <span style={{ fontSize: 22 }}>\ud83d\udee1</span>
+            <span style={{ fontSize: 22 }}>🛡</span>
             <div>
               <div style={{ color: "#fff", fontSize: 15, fontWeight: 700, letterSpacing: 0.3 }}>Infotrek Sanctions Screening</div>
               <div style={{ color: "#93c5fd", fontSize: 11 }}>Powered by Infotrek AI</div>
@@ -946,8 +946,8 @@ export default function App() {
           {/* Nav tabs */}
           <div style={{ display: "flex", gap: 4 }}>
             {[
-              { key: "screening",   label: "Sanctions Screening", icon: "\ud83d\udd0d" },
-              { key: "management",  label: "List Management",     icon: "\ud83d\udcca" },
+              { key: "screening",   label: "Sanctions Screening", icon: "🔍" },
+              { key: "management",  label: "List Management",     icon: "📊" },
             ].map(({ key, label, icon }) => (
               <button key={key} onClick={() => setPage(key)} style={{
                 padding: "16px 20px", background: page === key ? "rgba(255,255,255,0.12)" : "transparent",
