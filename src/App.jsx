@@ -413,7 +413,13 @@ Svara på svenska, koncist.`;
     setAiLoading(false);
   };
 
-  const filtered = results.filter(r => r.scores.combined >= threshold && (entityFilter === "all" || r.type === entityFilter));
+  const [sourceFilter, setSourceFilter] = useState("all");
+
+  const filtered = results.filter(r =>
+    r.scores.combined >= threshold &&
+    (entityFilter === "all" || r.type === entityFilter) &&
+    (sourceFilter === "all" || r.source === sourceFilter)
+  );
   const topScore = filtered[0]?.scores.combined ?? 0;
   const EXAMPLES = ["Vlademir Poutine", "Kim Jong Un", "Hassan Ali Rashid", "Carlos Ramirez", "Omar Bashir", "Ivan Wolkow", "Banco Nacional de Cuba", "Nord Stream"];
 
@@ -446,18 +452,10 @@ Svara på svenska, koncist.`;
               : listError
               ? `⚠ Fel vid laddning: ${listError}`
               : (() => {
-                  const individuals    = sanctionsList.filter(e => e.type === "individual").length;
-                  const organizations  = sanctionsList.filter(e => e.type === "organization").length;
-                  const vessels        = sanctionsList.filter(e => e.type === "vessel").length;
-                  const aircraft       = sanctionsList.filter(e => e.type === "aircraft").length;
-                  const parts = [
-                    `${sanctionsList.length.toLocaleString("sv-SE")} entiteter totalt`,
-                    `${individuals.toLocaleString("sv-SE")} individer`,
-                    `${organizations.toLocaleString("sv-SE")} organisationer`,
-                    vessels  > 0 ? `${vessels.toLocaleString("sv-SE")} fartyg`         : null,
-                    aircraft > 0 ? `${aircraft.toLocaleString("sv-SE")} luftfarkoster` : null,
-                  ].filter(Boolean);
-                  return parts.join(" · ");
+                  const ofac = sanctionsList.filter(e => e.source === "OFAC").length;
+                  const eu   = sanctionsList.filter(e => e.source === "EU").length;
+                  const un   = sanctionsList.filter(e => e.source === "UN").length;
+                  return `${sanctionsList.length.toLocaleString("sv-SE")} entiteter · OFAC ${ofac.toLocaleString("sv-SE")} · EU ${eu.toLocaleString("sv-SE")} · FN ${un.toLocaleString("sv-SE")} · 5 algoritmer · Infotrek AI`;
                 })()
             }
           </div>
@@ -528,6 +526,36 @@ Svara på svenska, koncist.`;
                   fontSize: 10, fontWeight: 700,
                   background: entityFilter === value ? "rgba(255,255,255,0.2)" : "#f3f4f6",
                   color: entityFilter === value ? "#fff" : "#9ca3af",
+                  padding: "1px 5px", borderRadius: 10
+                }}>{count.toLocaleString("sv-SE")}</span>
+              </button>
+            ))}
+          </div>
+
+          {/* Source filter */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 18, alignItems: "center" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#6b7280", letterSpacing: 0.5, marginRight: 4 }}>KÄLLA:</span>
+            {[
+              { value: "all",  label: "Alla",  count: sanctionsList.length },
+              { value: "OFAC", label: "OFAC",  count: sanctionsList.filter(e => e.source === "OFAC").length },
+              { value: "EU",   label: "EU",    count: sanctionsList.filter(e => e.source === "EU").length },
+              { value: "UN",   label: "FN",    count: sanctionsList.filter(e => e.source === "UN").length },
+            ].map(({ value, label, count }) => (
+              <button key={value} onClick={() => setSourceFilter(value)} style={{
+                padding: "5px 12px",
+                background: sourceFilter === value ? "#1e3a5f" : "#fff",
+                border: `1.5px solid ${sourceFilter === value ? "#1e3a5f" : "#d1d5db"}`,
+                borderRadius: 6, fontSize: 12,
+                color: sourceFilter === value ? "#fff" : "#4b5563",
+                cursor: "pointer", fontFamily: "inherit",
+                fontWeight: sourceFilter === value ? 600 : 400,
+                display: "flex", alignItems: "center", gap: 5
+              }}>
+                {label}
+                <span style={{
+                  fontSize: 10, fontWeight: 700,
+                  background: sourceFilter === value ? "rgba(255,255,255,0.2)" : "#f3f4f6",
+                  color: sourceFilter === value ? "#fff" : "#9ca3af",
                   padding: "1px 5px", borderRadius: 10
                 }}>{count.toLocaleString("sv-SE")}</span>
               </button>
