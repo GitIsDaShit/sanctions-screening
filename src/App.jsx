@@ -255,7 +255,7 @@ function ListManagement() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source }),
       });
-      if (res.status === 202) {
+      if (res.status === 202 || res.status === 204) {
         setUpdateStatus("done");
         setUpdateMsg("Update job started successfully. Refresh the page in a few minutes to see new data.");
       } else {
