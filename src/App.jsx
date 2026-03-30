@@ -243,29 +243,25 @@ function ListManagement() {
     loadDelta();
   }, []);
 
-  const [updateStatus, setUpdateStatus] = useState(null); // null | "running" | "done" | "error"
+  const [updateStatus, setUpdateStatus] = useState({}); // source -> status
   const [updateMsg, setUpdateMsg] = useState("");
 
   const triggerUpdate = async (source) => {
-    setUpdateStatus("running");
-    setUpdateMsg("Starting update job...");
+    setUpdateStatus(prev => ({ ...prev, [source]: "running" }));
+    setUpdateMsg("Starting update for " + source + "...");
     try {
-      // Create job record in Supabase first
-      const jobRes = await fetch(
-        `${process.env.REACT_APP_SUPABASE_URL || ""}`, // fallback via sanctions function
-      );
-
-      // Create job via sanctions function proxy
+      // Create job record
       const createRes = await fetch("/.netlify/functions/sanctions?action=create-job", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source }),
       });
+      if (!createRes.ok) throw new Error("Could not create job: " + createRes.status);
       const { jobId } = await createRes.json();
 
-      setUpdateMsg("Update started — checking status...");
+      setUpdateMsg("Fetching " + source + " from source...");
 
-      // Trigger background function with jobId
+      // Trigger background function
       await fetch("/.netlify/functions/update-sanctions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -279,29 +275,23 @@ function ListManagement() {
           const { job } = await statusRes.json();
           if (!job) return;
           setUpdateMsg(job.message || "Running...");
-          if (job.status === "done") {
-            setUpdateStatus("done");
+          if (["done", "no_change", "error"].includes(job.status)) {
+            setUpdateStatus(prev => ({ ...prev, [source]: job.status }));
             clearInterval(poll);
-            // Reload snapshots
-            fetch("/.netlify/functions/sanctions?action=snapshots")
-              .then(r => r.json())
-              .then(d => setSnapshots(d.snapshots || []));
-          } else if (job.status === "no_change") {
-            setUpdateStatus("no_change");
-            clearInterval(poll);
-          } else if (job.status === "error") {
-            setUpdateStatus("error");
-            clearInterval(poll);
+            if (job.status === "done") {
+              fetch("/.netlify/functions/sanctions?action=snapshots")
+                .then(r => r.json())
+                .then(d => setSnapshots(d.snapshots || []));
+            }
           }
         } catch (e) {}
       }, 5000);
 
-      // Stop polling after 15 minutes max
       setTimeout(() => clearInterval(poll), 900000);
 
     } catch (err) {
-      setUpdateStatus("error");
-      setUpdateMsg("Failed to start update: " + err.message);
+      setUpdateStatus(prev => ({ ...prev, [source]: "error" }));
+      setUpdateMsg("Failed to start update for " + source + ": " + err.message);
     }
   };
 
@@ -370,15 +360,19 @@ function ListManagement() {
               ) : (
                 <div style={{ fontSize: 13, color: "#9ca3af" }}>No data</div>
               )}
-              <button onClick={() => triggerUpdate(src)} disabled={updateStatus === "running"} style={{
+              <button onClick={() => triggerUpdate(src)} disabled={updateStatus[src] === "running"} style={{
                 marginTop: 14, width: "100%", padding: "7px 0", borderRadius: 7, fontSize: 12, fontWeight: 600,
-                cursor: updateStatus === "running" ? "not-allowed" : "pointer", fontFamily: "inherit",
-                background: updateStatus === "running" ? "#f3f4f6" : col.bg,
-                border: "1.5px solid " + (updateStatus === "running" ? "#e5e7eb" : col.border),
-                color: updateStatus === "running" ? "#9ca3af" : col.text,
+                cursor: updateStatus[src] === "running" ? "not-allowed" : "pointer", fontFamily: "inherit",
+                background: updateStatus[src] === "running" ? "#f3f4f6" : updateStatus[src] === "done" ? "#f0fdf4" : updateStatus[src] === "no_change" ? "#fffbeb" : col.bg,
+                border: "1.5px solid " + (updateStatus[src] === "running" ? "#e5e7eb" : updateStatus[src] === "done" ? "#bbf7d0" : updateStatus[src] === "no_change" ? "#fcd34d" : col.border),
+                color: updateStatus[src] === "running" ? "#9ca3af" : updateStatus[src] === "done" ? "#166534" : updateStatus[src] === "no_change" ? "#92400e" : col.text,
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               }}>
-                {updateStatus === "running" ? <><Spinner size={12} color={col.text} /> Updating...</> : "↻ Update " + src}
+                {updateStatus[src] === "running" ? <><Spinner size={12} color="#9ca3af" /> Updating...</>
+                 : updateStatus[src] === "done" ? "✓ Updated"
+                 : updateStatus[src] === "no_change" ? "— No new data"
+                 : updateStatus[src] === "error" ? "⚠ Error — retry?"
+                 : "↻ Update " + src}
               </button>
             </div>
           );
@@ -386,21 +380,30 @@ function ListManagement() {
       </div>
 
       {/* Update status message */}
-      {updateStatus && (
+      {updateMsg && Object.values(updateStatus).some(s => s) && (
         <div style={{
           marginBottom: 24, padding: "12px 18px", borderRadius: 10, fontSize: 13,
-          background: updateStatus === "error" ? "#fef2f2" : updateStatus === "done" ? "#f0fdf4" : updateStatus === "no_change" ? "#fffbeb" : "#f0f7ff",
-          border: "1px solid " + (updateStatus === "error" ? "#fca5a5" : updateStatus === "done" ? "#bbf7d0" : updateStatus === "no_change" ? "#fcd34d" : "#bfdbfe"),
-          color: updateStatus === "error" ? "#dc2626" : updateStatus === "done" ? "#166534" : updateStatus === "no_change" ? "#92400e" : "#1e3a5f",
+          background: Object.values(updateStatus).includes("error") ? "#fef2f2"
+            : Object.values(updateStatus).includes("running") ? "#f0f7ff"
+            : Object.values(updateStatus).includes("done") ? "#f0fdf4"
+            : "#fffbeb",
+          border: "1px solid " + (Object.values(updateStatus).includes("error") ? "#fca5a5"
+            : Object.values(updateStatus).includes("running") ? "#bfdbfe"
+            : Object.values(updateStatus).includes("done") ? "#bbf7d0"
+            : "#fcd34d"),
+          color: Object.values(updateStatus).includes("error") ? "#dc2626"
+            : Object.values(updateStatus).includes("running") ? "#1e3a5f"
+            : Object.values(updateStatus).includes("done") ? "#166534"
+            : "#92400e",
           display: "flex", alignItems: "center", gap: 10,
         }}>
-          {updateStatus === "running" && <Spinner size={16} color="#1e3a5f" />}
-          {updateStatus === "done" && "✓ "}
-          {updateStatus === "no_change" && "— "}
-          {updateStatus === "error" && "⚠ "}
+          {Object.values(updateStatus).includes("running") && <Spinner size={16} color="#1e3a5f" />}
+          {!Object.values(updateStatus).includes("running") && Object.values(updateStatus).includes("done") && "✓ "}
+          {!Object.values(updateStatus).includes("running") && !Object.values(updateStatus).includes("done") && Object.values(updateStatus).includes("no_change") && "— "}
+          {Object.values(updateStatus).includes("error") && "⚠ "}
           {updateMsg}
-          {updateStatus !== "running" && (
-            <button onClick={() => setUpdateStatus(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#9ca3af" }}>✕</button>
+          {!Object.values(updateStatus).includes("running") && (
+            <button onClick={() => { setUpdateStatus({}); setUpdateMsg(""); }} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#9ca3af" }}>✕</button>
           )}
         </div>
       )}
