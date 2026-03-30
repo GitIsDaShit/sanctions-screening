@@ -1041,4 +1041,6 @@ Svara på svenska, koncist.`;
           </svg>
         </div>
       </div>
-  );`r`n}
+    </div>
+  );
+}
