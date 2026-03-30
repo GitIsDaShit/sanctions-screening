@@ -397,20 +397,20 @@ export default function App() {
     setAiLoading(true);
     setAiAnalysis(null);
     const topHits = results.filter(r => r.scores.combined >= 50).slice(0, 5);
-    const prompt = `Du är en expert på sanktionsscreening för en europeisk bank.
-
-En kund med namnet "${query}" har screenats mot sanktionslistor (${sourceFilter === "all" ? "OFAC, EU och FN" : sourceFilter === "UN" ? "FN" : sourceFilter}).
-
-ALGORITMISKA RESULTAT:
-${topHits.map(r => `- ${r.name} (${r.nationality || r.country || "okänt land"}, ${r.program}) — score: ${r.scores.combined}/100, matchad mot: "${r.matchedName}"`).join("\n")}
-
-Gör en professionell bedömning:
-1. Är "${query}" sannolikt samma person som någon på listan?
-2. Ta hänsyn till namnvarianter, kulturella konventioner, translitterering.
-3. Rekommendera: BLOCKERA / MANUELL GRANSKNING / GODKÄNN
-4. Kort motivering.
-
-Svara på svenska, koncist.`;
+    const hitLines = topHits.map(r =>
+      "- " + r.name + " (" + (r.nationality || r.country || "okänt land") + ", " + r.program + ") — score: " + r.scores.combined + "/100, matchad mot: \"" + r.matchedName + "\""
+    ).join("\n");
+    const srcLabel = sourceFilter === "all" ? "OFAC, EU och FN" : sourceFilter === "UN" ? "FN" : sourceFilter;
+    const prompt =
+      "Du är en expert på sanktionsscreening för en europeisk bank.\n\n" +
+      "En kund med namnet \"" + query + "\" har screenats mot sanktionslistor (" + srcLabel + ").\n\n" +
+      "ALGORITMISKA RESULTAT:\n" + hitLines + "\n\n" +
+      "Gör en professionell bedömning:\n" +
+      "1. Är \"" + query + "\" sannolikt samma person som någon på listan?\n" +
+      "2. Ta hänsyn till namnvarianter, kulturella konventioner, translitterering.\n" +
+      "3. Rekommendera: BLOCKERA / MANUELL GRANSKNING / GODKÄNN\n" +
+      "4. Kort motivering.\n\n" +
+      "Svara på svenska, koncist.";
 
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -1002,6 +1002,7 @@ Svara på svenska, koncist.`;
                     return `Jämförs mot ${sanctionsList.length.toLocaleString("sv-SE")} entiteter · OFAC ${ofac.toLocaleString("sv-SE")} · EU ${eu.toLocaleString("sv-SE")} · FN ${un.toLocaleString("sv-SE")} · 5 matchningsalgoritmer + Infotrek AI`;
                   })()}
             </div>
+          </div>
         )}
 
         {/* Footer logga */}
