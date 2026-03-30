@@ -36,7 +36,7 @@ export default async (req) => {
     // Hämta snapshots för dropdown - direkt från tabellen, ingen RPC behövs
     if (action === "snapshots") {
       const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/list_snapshot?select=id,source,snapshot_date,entity_count&order=snapshot_date.desc,source.asc`,
+        `${SUPABASE_URL}/rest/v1/list_snapshot?select=id,source,snapshot_date,entity_count,fetched_at,version_hash&order=snapshot_date.desc,source.asc`,
         {
           headers: {
             "apikey":        SUPABASE_ANON_KEY,
