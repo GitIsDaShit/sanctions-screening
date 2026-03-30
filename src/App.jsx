@@ -243,6 +243,31 @@ function ListManagement() {
     loadDelta();
   }, []);
 
+  const [updateStatus, setUpdateStatus] = useState(null); // null | "running" | "done" | "error"
+  const [updateMsg, setUpdateMsg] = useState("");
+
+  const triggerUpdate = async (source) => {
+    setUpdateStatus("running");
+    setUpdateMsg("Update started — this runs in the background and may take a few minutes...");
+    try {
+      const res = await fetch("/.netlify/functions/update-sanctions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source }),
+      });
+      if (res.status === 202) {
+        setUpdateStatus("done");
+        setUpdateMsg("Update job started successfully. Refresh the page in a few minutes to see new data.");
+      } else {
+        setUpdateStatus("error");
+        setUpdateMsg("Unexpected response: " + res.status);
+      }
+    } catch (err) {
+      setUpdateStatus("error");
+      setUpdateMsg("Failed to trigger update: " + err.message);
+    }
+  };
+
   const loadDelta = () => {
     setDeltaLoading(true);
     fetch("/.netlify/functions/sanctions?action=delta")
@@ -308,10 +333,39 @@ function ListManagement() {
               ) : (
                 <div style={{ fontSize: 13, color: "#9ca3af" }}>No data</div>
               )}
+              <button onClick={() => triggerUpdate(src)} disabled={updateStatus === "running"} style={{
+                marginTop: 14, width: "100%", padding: "7px 0", borderRadius: 7, fontSize: 12, fontWeight: 600,
+                cursor: updateStatus === "running" ? "not-allowed" : "pointer", fontFamily: "inherit",
+                background: updateStatus === "running" ? "#f3f4f6" : col.bg,
+                border: "1.5px solid " + (updateStatus === "running" ? "#e5e7eb" : col.border),
+                color: updateStatus === "running" ? "#9ca3af" : col.text,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              }}>
+                {updateStatus === "running" ? <><Spinner size={12} color={col.text} /> Updating...</> : "↻ Update " + src}
+              </button>
             </div>
           );
         })}
       </div>
+
+      {/* Update status message */}
+      {updateStatus && (
+        <div style={{
+          marginBottom: 24, padding: "12px 18px", borderRadius: 10, fontSize: 13,
+          background: updateStatus === "error" ? "#fef2f2" : updateStatus === "done" ? "#f0fdf4" : "#f0f7ff",
+          border: "1px solid " + (updateStatus === "error" ? "#fca5a5" : updateStatus === "done" ? "#bbf7d0" : "#bfdbfe"),
+          color: updateStatus === "error" ? "#dc2626" : updateStatus === "done" ? "#166534" : "#1e3a5f",
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          {updateStatus === "running" && <Spinner size={16} color="#1e3a5f" />}
+          {updateStatus === "done" && "✓ "}
+          {updateStatus === "error" && "⚠ "}
+          {updateMsg}
+          {updateStatus !== "running" && (
+            <button onClick={() => setUpdateStatus(null)} style={{ marginLeft: "auto", background: "none", border: "none", cursor: "pointer", fontSize: 16, color: "#9ca3af" }}>✕</button>
+          )}
+        </div>
+      )}
 
       {/* Snapshot history table */}
       <div style={{ background: "#fff", borderRadius: 12, border: "1.5px solid #e5e7eb", marginBottom: 32, overflow: "hidden" }}>
