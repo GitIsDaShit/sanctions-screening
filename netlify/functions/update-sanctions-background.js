@@ -11,14 +11,14 @@ const EU_URL = "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctio
 const UN_URL = "https://scsanctions.un.org/resources/xml/en/consolidated.xml";
 
 // ── Supabase helpers ──────────────────────────────────────────────────────────
-async function sb(method, path, body = null) {
+async function sb(method, path, body = null, prefer = "return=representation") {
   const opts = {
     method,
     headers: {
       "apikey": SUPABASE_KEY,
       "Authorization": `Bearer ${SUPABASE_KEY}`,
       "Content-Type": "application/json",
-      "Prefer": "return=representation",
+      "Prefer": prefer,
     },
   };
   if (body) opts.body = JSON.stringify(body);
@@ -295,8 +295,13 @@ async function updateSource(source, entries, sourceDate, downloadUrl) {
       entityId = existingInactive[0].id;
       await sb("PATCH", `entity?id=eq.${entityId}`, { is_active: true, last_seen_at: now, primary_name: e.name });
     } else {
-      const newEnt = await sb("POST", "entity", { canonical_id: cid, source, entity_type: e.type || "unknown", primary_name: e.name, first_seen_at: now, last_seen_at: now, is_active: true });
-      entityId = newEnt[0].id;
+      const newEnt = await sb("POST", "entity", { canonical_id: cid, source, entity_type: e.type || "unknown", primary_name: e.name, first_seen_at: now, last_seen_at: now, is_active: true }, "resolution=ignore-duplicates");
+      entityId = newEnt?.[0]?.id;
+      if (!entityId) {
+        // Already exists — fetch it
+        const found = await sb("GET", `entity?select=id&canonical_id=eq.${encodeURIComponent(cid)}&source=eq.${source}`);
+        entityId = found?.[0]?.id;
+      }
     }
     const newVer = await sb("POST", "entity_version", { entity_id: entityId, snapshot_id: snapshotId, program: e.program, dob: e.dob || null, nationality: e.nationality || null, valid_from: now, valid_to: null });
     const versionId = newVer[0].id;
