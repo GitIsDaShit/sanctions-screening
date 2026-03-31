@@ -136,14 +136,25 @@ async function loadOfac() {
 // ── EU parser ─────────────────────────────────────────────────────────────────
 async function loadEu() {
   console.log("Fetching EU...");
-  const res = await fetch(EU_URL, { headers: { "User-Agent": "Infotrek-Sanctions-Screening/1.0" } });
+  const res = await fetch(EU_URL, { headers: { "User-Agent": "Mozilla/5.0 (compatible; Infotrek-Sanctions/1.0)" } });
   if (!res.ok) throw new Error(`EU fetch failed: ${res.status}`);
   const xml = await res.text();
+
+  if (xml.trim().startsWith("<html") || xml.trim().startsWith("<!DOCTYPE")) {
+    throw new Error("EU returned HTML instead of XML");
+  }
+
+  console.log("  EU XML first 200 chars:", xml.slice(0, 200));
 
   const genDateMatch = xml.match(/generationDate="([^"]+)"/);
   const sourceDate = genDateMatch ? genDateMatch[1].slice(0, 10) : new Date().toISOString().slice(0, 10);
 
-  const entityBlocks = getTagContent(xml, "sanctionEntity");
+  // EU XML uses namespaces — strip all namespace prefixes for simpler parsing
+  const stripped = xml.replace(/<([\/]?)[\w]+:/g, "<$1");
+
+  const entityBlocks = getTagContent(stripped, "sanctionEntity");
+  console.log(`  Found ${entityBlocks.length} sanctionEntity blocks`);
+
   const entries = {};
 
   for (const block of entityBlocks) {
