@@ -1,0 +1,65 @@
+name: Update Sanctions Lists
+
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: 'Source to update (OFAC, EU, UN, ALL)'
+        required: true
+        default: 'ALL'
+      job_id:
+        description: 'Job ID for status tracking'
+        required: false
+        default: ''
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary lxml requests
+
+      - name: Update job status — running
+        if: ${{ github.event.inputs.job_id != '' }}
+        run: |
+          curl -s -X PATCH \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/update_job?id=eq.${{ github.event.inputs.job_id }}" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"status\":\"running\",\"message\":\"GitHub Actions: running update_sanctions.py --source ${{ github.event.inputs.source }}\"}"
+
+      - name: Run update_sanctions.py
+        env:
+          SOURCE: ${{ github.event.inputs.source }}
+        run: python update_sanctions.py --source $SOURCE
+
+      - name: Update job status — done
+        if: ${{ success() && github.event.inputs.job_id != '' }}
+        run: |
+          curl -s -X PATCH \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/update_job?id=eq.${{ github.event.inputs.job_id }}" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"status\":\"done\",\"message\":\"Update completed for ${{ github.event.inputs.source }}\",\"completed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+
+      - name: Update job status — error
+        if: ${{ failure() && github.event.inputs.job_id != '' }}
+        run: |
+          curl -s -X PATCH \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/update_job?id=eq.${{ github.event.inputs.job_id }}" \
+            -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"status\":\"error\",\"message\":\"update_sanctions.py failed for ${{ github.event.inputs.source }}\",\"completed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
