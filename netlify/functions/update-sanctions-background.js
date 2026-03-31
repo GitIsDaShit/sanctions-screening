@@ -130,6 +130,9 @@ async function loadOfac() {
   }
 
   console.log(`  OFAC: ${Object.keys(entries).length} entries, date: ${today}`);
+  if (Object.keys(entries).length === 0) {
+    throw new Error("OFAC parser returned 0 entries — aborting to prevent data loss");
+  }
   return { entries, sourceDate: today, downloadUrl: "https://www.treasury.gov/ofac/downloads/sdn.xml" };
 }
 
@@ -214,6 +217,9 @@ async function loadEu() {
   }
 
   console.log(`  EU: ${Object.keys(entries).length} entries, date: ${sourceDate}`);
+  if (Object.keys(entries).length === 0) {
+    throw new Error("EU parser returned 0 entries — aborting to prevent data loss");
+  }
   return { entries, sourceDate, downloadUrl: EU_URL };
 }
 
@@ -252,6 +258,9 @@ async function loadUn() {
   for (const b of getTagContent(xml, "ENTITY"))     processBlock(b, "organization");
 
   console.log(`  UN: ${Object.keys(entries).length} entries, date: ${sourceDate}`);
+  if (Object.keys(entries).length === 0) {
+    throw new Error("UN parser returned 0 entries — aborting to prevent data loss");
+  }
   return { entries, sourceDate, downloadUrl: UN_URL };
 }
 
