@@ -162,6 +162,7 @@ export default async (req) => {
     }
 
 
+    const params = snapshotId ? { p_snapshot_id: snapshotId } : {};
     const rows = await rpc("get_sanctions_entries", params);
 
     const entries = rows.map(r => ({
