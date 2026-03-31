@@ -348,19 +348,15 @@ async function updateSource(source, entries, sourceDate, downloadUrl) {
   // ADDED
   for (const cid of addedIds) {
     const e = entries[cid];
-    const existingInactive = await sb("GET", `entity?select=id&canonical_id=eq.${encodeURIComponent(cid)}&source=eq.${source}&is_active=eq.false`);
-    let entityId;
-    if (existingInactive && existingInactive.length > 0) {
-      entityId = existingInactive[0].id;
-      await sb("PATCH", `entity?id=eq.${entityId}`, { is_active: true, last_seen_at: now, primary_name: e.name });
-    } else {
-      const newEnt = await sb("POST", "entity", { canonical_id: cid, source, entity_type: e.type || "unknown", primary_name: e.name, first_seen_at: now, last_seen_at: now, is_active: true }, "resolution=ignore-duplicates");
-      entityId = newEnt?.[0]?.id;
-      if (!entityId) {
-        // Already exists — fetch it
-        const found = await sb("GET", `entity?select=id&canonical_id=eq.${encodeURIComponent(cid)}&source=eq.${source}`);
-        entityId = found?.[0]?.id;
-      }
+    // Upsert entity — handles both new and reactivated
+    const upserted = await sb("POST", "entity", {
+      canonical_id: cid, source, entity_type: e.type || "unknown",
+      primary_name: e.name, first_seen_at: now, last_seen_at: now, is_active: true,
+    }, "resolution=merge-duplicates,return=representation");
+    const entityId = upserted?.[0]?.id;
+    if (!entityId) {
+      console.error(`Could not upsert entity ${cid}`);
+      continue;
     }
     const newVer = await sb("POST", "entity_version", { entity_id: entityId, snapshot_id: snapshotId, program: e.program, dob: e.dob || null, nationality: e.nationality || null, valid_from: now, valid_to: null });
     const versionId = newVer[0].id;
