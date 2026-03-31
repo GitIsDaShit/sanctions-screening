@@ -139,23 +139,29 @@ async function loadEu() {
   const res = await fetch(EU_URL, { headers: { "User-Agent": "Mozilla/5.0 (compatible; Infotrek-Sanctions/1.0)" } });
   if (!res.ok) throw new Error(`EU fetch failed: ${res.status}`);
   const xml = await res.text();
-
-  if (xml.trim().startsWith("<html") || xml.trim().startsWith("<!DOCTYPE")) {
-    throw new Error("EU returned HTML instead of XML");
-  }
-
-  console.log("  EU XML first 200 chars:", xml.slice(0, 200));
+  if (xml.trim().startsWith("<html") || xml.trim().startsWith("<!DOCTYPE")) throw new Error("EU returned HTML");
 
   const genDateMatch = xml.match(/generationDate="([^"]+)"/);
   const sourceDate = genDateMatch ? genDateMatch[1].slice(0, 10) : new Date().toISOString().slice(0, 10);
 
-  // EU XML uses namespaces — strip all namespace prefixes for simpler parsing
+  // Strip namespace prefixes
   const stripped = xml.replace(/<([\/]?)[\w]+:/g, "<$1");
 
-  const entityBlocks = getTagContent(stripped, "sanctionEntity");
-  console.log(`  Found ${entityBlocks.length} sanctionEntity blocks`);
+  // Split on opening sanctionEntity tags to get individual entity blocks
+  // Each block starts at <sanctionEntity and ends at </sanctionEntity>
+  const entityBlocks = [];
+  const splitTag = "<sanctionEntity ";
+  const parts = stripped.split(splitTag);
+  for (let i = 1; i < parts.length; i++) {
+    const endIdx = parts[i].indexOf("</sanctionEntity>");
+    if (endIdx !== -1) {
+      entityBlocks.push(splitTag + parts[i].slice(0, endIdx + "</sanctionEntity>".length));
+    }
+  }
+
+  console.log(`  Found ${entityBlocks.length} entity blocks`);
   if (entityBlocks.length > 0) {
-    console.log("  First block sample:", entityBlocks[0].slice(0, 400));
+    console.log("  First entity sample:", entityBlocks[0].slice(0, 300));
   }
 
   const entries = {};
@@ -164,7 +170,9 @@ async function loadEu() {
     const euRef = getAttr(block, "euReferenceNumber");
     const logId = getAttr(block, "logicalId");
     const id = euRef || ("EU-" + logId);
+    if (!id) continue;
 
+    // Get nameAlias blocks
     const nameAliasBlocks = getTagContent(block, "nameAlias");
     let primaryName = null;
     const aliases = [];
@@ -175,7 +183,9 @@ async function loadEu() {
       if (strong === "true" && !primaryName) primaryName = whole.trim();
       else aliases.push(whole.trim());
     }
-    if (!primaryName && nameAliasBlocks.length > 0) primaryName = getAttr(nameAliasBlocks[0], "wholeName")?.trim();
+    if (!primaryName && nameAliasBlocks.length > 0) {
+      primaryName = getAttr(nameAliasBlocks[0], "wholeName")?.trim();
+    }
     if (!primaryName) continue;
 
     const subtypeBlock = block.match(/<subjectType[^>]*/)?.[0] || "";
