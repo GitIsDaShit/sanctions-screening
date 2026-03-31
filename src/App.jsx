@@ -609,7 +609,11 @@ function SanctionsScreening() {
       : "/.netlify/functions/sanctions";
     fetch(url)
       .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-      .then(data => { setSanctionsList(data.entries || data); setListLoading(false); })
+      .then(data => { 
+        const entries = data.entries || data;
+        setSanctionsList(Array.isArray(entries) ? entries : []); 
+        setListLoading(false); 
+      })
       .catch(err => { setListError(err.message); setListLoading(false); });
   };
 
