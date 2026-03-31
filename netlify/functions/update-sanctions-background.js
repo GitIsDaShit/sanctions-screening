@@ -165,10 +165,13 @@ async function loadEu() {
   console.log(`  Found ${entityBlocks.length} entity blocks`);
   if (entityBlocks.length > 0) {
     console.log("  First entity sample:", entityBlocks[0].slice(0, 600));
-    // Check if nameAlias exists
-    const testAliases = getTagContent(entityBlocks[0], "nameAlias");
+    // Check if nameAlias exists using same regex as parser
+    const testAliasRegex = /<nameAlias[\s\S]*?\/>/gi;
+    const testAliases = [];
+    let tam;
+    while ((tam = testAliasRegex.exec(entityBlocks[0])) !== null) testAliases.push(tam[0]);
     console.log("  nameAlias count in first block:", testAliases.length);
-    if (testAliases.length > 0) console.log("  First nameAlias:", testAliases[0].slice(0, 100));
+    if (testAliases.length > 0) console.log("  First nameAlias:", testAliases[0].slice(0, 200));
   }
 
   const entries = {};
@@ -179,12 +182,18 @@ async function loadEu() {
     const id = euRef || ("EU-" + logId);
     if (!id) continue;
 
-    // nameAlias in EU XML are self-closing: <nameAlias wholeName="..." strong="true"/>
+    // nameAlias in EU XML are self-closing with attributes (may span multiple lines)
     const nameAliasBlocks = [];
-    const naRegex = /<nameAlias[^>]*\/>/gi;
+    const naRegex = /<nameAlias[\s\S]*?\/>/gi;
     let naMatch;
     while ((naMatch = naRegex.exec(block)) !== null) {
       nameAliasBlocks.push(naMatch[0]);
+    }
+    if (nameAliasBlocks.length === 0) {
+      // Fallback: some may use closing tag
+      const naRegex2 = /<nameAlias[\s\S]*?<\/nameAlias>/gi;
+      let m2;
+      while ((m2 = naRegex2.exec(block)) !== null) nameAliasBlocks.push(m2[0]);
     }
     let primaryName = null;
     const aliases = [];
