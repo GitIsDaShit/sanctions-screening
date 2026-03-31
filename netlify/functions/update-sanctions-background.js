@@ -348,14 +348,24 @@ async function updateSource(source, entries, sourceDate, downloadUrl) {
   // ADDED
   for (const cid of addedIds) {
     const e = entries[cid];
-    // Upsert entity — handles both new and reactivated
-    const upserted = await sb("POST", "entity", {
-      canonical_id: cid, source, entity_type: e.type || "unknown",
-      primary_name: e.name, first_seen_at: now, last_seen_at: now, is_active: true,
-    }, "resolution=merge-duplicates,return=representation");
-    const entityId = upserted?.[0]?.id;
+    let entityId;
+
+    // Try to find existing entity first (active or inactive)
+    const existing = await sb("GET", `entity?select=id&canonical_id=eq.${encodeURIComponent(cid)}&source=eq.${source}`);
+    if (existing && existing.length > 0) {
+      entityId = existing[0].id;
+      await sb("PATCH", `entity?id=eq.${entityId}`, { is_active: true, last_seen_at: now, primary_name: e.name });
+    } else {
+      // Create new entity
+      const newEnt = await sb("POST", "entity", {
+        canonical_id: cid, source, entity_type: e.type || "unknown",
+        primary_name: e.name, first_seen_at: now, last_seen_at: now, is_active: true,
+      });
+      entityId = newEnt?.[0]?.id;
+    }
+
     if (!entityId) {
-      console.error(`Could not upsert entity ${cid}`);
+      console.error(`Could not get entityId for ${cid} — skipping`);
       continue;
     }
     const newVer = await sb("POST", "entity_version", { entity_id: entityId, snapshot_id: snapshotId, program: e.program, dob: e.dob || null, nationality: e.nationality || null, valid_from: now, valid_to: null });
