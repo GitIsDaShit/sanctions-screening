@@ -154,6 +154,9 @@ async function loadEu() {
 
   const entityBlocks = getTagContent(stripped, "sanctionEntity");
   console.log(`  Found ${entityBlocks.length} sanctionEntity blocks`);
+  if (entityBlocks.length > 0) {
+    console.log("  First block sample:", entityBlocks[0].slice(0, 400));
+  }
 
   const entries = {};
 
