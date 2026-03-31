@@ -179,8 +179,13 @@ async function loadEu() {
     const id = euRef || ("EU-" + logId);
     if (!id) continue;
 
-    // Get nameAlias blocks
-    const nameAliasBlocks = getTagContent(block, "nameAlias");
+    // nameAlias in EU XML are self-closing: <nameAlias wholeName="..." strong="true"/>
+    const nameAliasBlocks = [];
+    const naRegex = /<nameAlias[^>]*\/>/gi;
+    let naMatch;
+    while ((naMatch = naRegex.exec(block)) !== null) {
+      nameAliasBlocks.push(naMatch[0]);
+    }
     let primaryName = null;
     const aliases = [];
     for (const na of nameAliasBlocks) {
@@ -195,21 +200,29 @@ async function loadEu() {
     }
     if (!primaryName) continue;
 
-    const subtypeBlock = block.match(/<subjectType[^>]*/)?.[0] || "";
+    // subjectType is self-closing: <subjectType classificationCode="P"/>
+    const subtypeMatch = block.match(/<subjectType[^>]*\/>/i) || block.match(/<subjectType[^>]*/i);
+    const subtypeBlock = subtypeMatch?.[0] || "";
     const cc = getAttr(subtypeBlock, "classificationCode") || "";
     const type = { P: "individual", E: "organization", V: "vessel" }[cc] || "unknown";
 
-    const regBlock = block.match(/<regulation[^>]*/)?.[0] || "";
+    // regulation is self-closing or has content
+    const regMatch = block.match(/<regulation[^>]*/i);
+    const regBlock = regMatch?.[0] || "";
     const program = getAttr(regBlock, "programme") || null;
 
+    // birthdate is self-closing: <birthdate birthdate="1956" calendarType="GREGORIAN"/>
     let dob = null;
-    const bdBlocks = block.match(/<birthdate[^>]*/g) || [];
-    for (const bd of bdBlocks) {
-      const d = getAttr(bd, "birthdate") || getAttr(bd, "year");
+    const bdRegex = /<birthdate[^>]*\/>/gi;
+    let bdMatch;
+    while ((bdMatch = bdRegex.exec(block)) !== null) {
+      const d = getAttr(bdMatch[0], "birthdate") || getAttr(bdMatch[0], "year");
       if (d) { dob = d; break; }
     }
 
-    const citBlock = block.match(/<citizenship[^>]*/)?.[0] || "";
+    // citizenship is self-closing: <citizenship countryDescription="Iraq"/>
+    const citMatch = block.match(/<citizenship[^>]*\/>/i) || block.match(/<citizenship[^>]*/i);
+    const citBlock = citMatch?.[0] || "";
     const nationality = getAttr(citBlock, "countryDescription") || null;
 
     const fp = sha256(JSON.stringify({ name: primaryName, program, type, dob, nationality, aliases: [...aliases].sort() }));
