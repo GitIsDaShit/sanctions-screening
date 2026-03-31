@@ -210,6 +210,7 @@ def update_source(source, new_entries, source_date, download_url):
     cur.execute("SELECT id FROM list_snapshot WHERE source = %s AND version_hash = %s", (source, fp_hash))
     if cur.fetchone():
         print("  Ingen förändring sedan senaste inläsning. Avslutar.")
+        print(f"STATUS:no_change:{source}")
         conn.close()
         return
     version_hash = fp_hash
@@ -369,6 +370,7 @@ def update_source(source, new_entries, source_date, download_url):
     cur.close()
     conn.close()
     print(f"  Klar!")
+    print(f"STATUS:done:{source}:added={len(delta_rows)}")
 
 def main():
     parser = argparse.ArgumentParser()

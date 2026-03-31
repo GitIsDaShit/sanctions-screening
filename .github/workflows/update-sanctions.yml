@@ -25,6 +25,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
       - name: Install dependencies
         run: pip install psycopg2-binary lxml requests
@@ -37,14 +38,34 @@ jobs:
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"status\":\"running\",\"message\":\"GitHub Actions: running update_sanctions.py --source ${{ github.event.inputs.source }}\"}"
+            -d "{\"status\":\"running\",\"message\":\"Running update for ${{ github.event.inputs.source }}...\"}"
 
-      - name: Run update_sanctions.py
+      - name: Run update
+        id: run_update
         env:
           SOURCE: ${{ github.event.inputs.source }}
-        run: python update_sanctions.py --source $SOURCE
+        run: |
+          OUTPUT=$(python update_sanctions.py --source $SOURCE 2>&1)
+          echo "$OUTPUT"
+          # Parse STATUS lines from output
+          STATUS_LINE=$(echo "$OUTPUT" | grep "^STATUS:" | tail -1)
+          if [ -z "$STATUS_LINE" ]; then
+            echo "job_status=done" >> $GITHUB_OUTPUT
+            echo "job_message=Update completed for $SOURCE" >> $GITHUB_OUTPUT
+          else
+            KIND=$(echo "$STATUS_LINE" | cut -d: -f2)
+            SRC=$(echo "$STATUS_LINE" | cut -d: -f3)
+            EXTRA=$(echo "$STATUS_LINE" | cut -d: -f4)
+            if [ "$KIND" = "no_change" ]; then
+              echo "job_status=no_change" >> $GITHUB_OUTPUT
+              echo "job_message=No new data available for $SRC" >> $GITHUB_OUTPUT
+            else
+              echo "job_status=done" >> $GITHUB_OUTPUT
+              echo "job_message=Update completed for $SRC ($EXTRA)" >> $GITHUB_OUTPUT
+            fi
+          fi
 
-      - name: Update job status — done
+      - name: Update job status — result
         if: ${{ success() && github.event.inputs.job_id != '' }}
         run: |
           curl -s -X PATCH \
@@ -52,7 +73,7 @@ jobs:
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"status\":\"done\",\"message\":\"Update completed for ${{ github.event.inputs.source }}\",\"completed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+            -d "{\"status\":\"${{ steps.run_update.outputs.job_status }}\",\"message\":\"${{ steps.run_update.outputs.job_message }}\",\"completed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
 
       - name: Update job status — error
         if: ${{ failure() && github.event.inputs.job_id != '' }}
@@ -62,4 +83,4 @@ jobs:
             -H "apikey: ${{ secrets.SUPABASE_KEY }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_KEY }}" \
             -H "Content-Type: application/json" \
-            -d "{\"status\":\"error\",\"message\":\"update_sanctions.py failed for ${{ github.event.inputs.source }}\",\"completed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
+            -d "{\"status\":\"error\",\"message\":\"Update failed for ${{ github.event.inputs.source }}\",\"completed_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
