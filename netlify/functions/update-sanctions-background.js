@@ -261,11 +261,14 @@ async function loadUn() {
     const ref = clean(parseXmlText(block, "REFERENCE_NUMBER") || parseXmlText(block, "DATAID") || "");
     const first = clean(parseXmlText(block, "FIRST_NAME") || "");
     if (!first) return;
-    const id = ref || ("UN-" + etype.slice(0, 3).toUpperCase() + "-" + Math.random().toString(36).slice(2, 10));
+    const id = ref || ("UN-" + etype.slice(0, 3).toUpperCase() + "-" + sha256(name).slice(0, 12));
     const parts = [first, clean(parseXmlText(block, "SECOND_NAME")), clean(parseXmlText(block, "THIRD_NAME")), clean(parseXmlText(block, "FOURTH_NAME"))].filter(Boolean);
     const name = parts.join(" ");
     const program = clean(parseXmlText(block, "UN_LIST_TYPE"));
-    const nat = clean(parseXmlText(block, "VALUE"));
+    // Nationality — must be from NATIONALITY block specifically
+    let nat = null;
+    const natBlockMatch = block.match(/<NATIONALITY[^>]*>([\s\S]*?)<\/NATIONALITY>/i);
+    if (natBlockMatch) nat = clean(parseXmlText(natBlockMatch[1], "VALUE") || "");
     let dob = null;
     const dobBlocks = getTagContent(block, etype.toUpperCase() + "_DATE_OF_BIRTH");
     for (const db of dobBlocks) {
