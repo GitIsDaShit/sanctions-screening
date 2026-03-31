@@ -161,7 +161,11 @@ async function loadEu() {
 
   console.log(`  Found ${entityBlocks.length} entity blocks`);
   if (entityBlocks.length > 0) {
-    console.log("  First entity sample:", entityBlocks[0].slice(0, 300));
+    console.log("  First entity sample:", entityBlocks[0].slice(0, 600));
+    // Check if nameAlias exists
+    const testAliases = getTagContent(entityBlocks[0], "nameAlias");
+    console.log("  nameAlias count in first block:", testAliases.length);
+    if (testAliases.length > 0) console.log("  First nameAlias:", testAliases[0].slice(0, 100));
   }
 
   const entries = {};
