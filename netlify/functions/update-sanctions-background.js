@@ -379,6 +379,7 @@ async function updateSource(source, entries, sourceDate, downloadUrl) {
 
   // MODIFIED & UNCHANGED
   let modifiedCount = 0;
+  const unchangedIds = [];
   const WATCH = [["name", "primary_name", "name"], ["program", "program", "program"], ["dob", "dob", "dob"], ["nationality", "nationality", "nationality"]];
 
   for (const cid of commonIds) {
@@ -405,8 +406,17 @@ async function updateSource(source, entries, sourceDate, downloadUrl) {
       }
       modifiedCount++;
     } else {
-      await sb("PATCH", `entity?id=eq.${entityId}`, { last_seen_at: now });
+      unchangedIds.push(entityId);
     }
+  }
+
+  // Batch update last_seen_at for unchanged entities using RPC or chunked IN
+  if (unchangedIds.length > 0) {
+    for (let i = 0; i < unchangedIds.length; i += 200) {
+      const chunk = unchangedIds.slice(i, i + 200);
+      await sb("PATCH", `entity?id=in.(${chunk.join(",")})`, { last_seen_at: now });
+    }
+    console.log(`  Unchanged batch updated: ${unchangedIds.length}`);
   }
 
   // DELTA LOG — batch insert
