@@ -187,7 +187,7 @@ export default async (req) => {
       entries,
     }), {
       status: 200,
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=3600" },
     });
 
   } catch (err) {
