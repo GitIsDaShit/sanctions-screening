@@ -20,6 +20,7 @@ export default async (req) => {
           { headers: { "X-Api-Key": NEWS_API_KEY } }
         );
         const newsData = await newsRes.json();
+        console.log("NewsAPI status:", newsData.status, "total:", newsData.totalResults, "error:", newsData.message);
         if (newsData.articles) {
           for (const a of newsData.articles) {
             if (!a.title || a.title === "[Removed]" || seen.has(a.url)) continue;
