@@ -311,7 +311,7 @@ def update_source(source, new_entries, source_date, download_url):
         conn.close()
         return
 
-    # Hämta aktiva entiteter + aktuella fingerprints
+    # Hämta aktiva entiteter
     cur.execute("""
         SELECT e.canonical_id, e.id, ev.id, e.primary_name,
                ev.program, ev.dob, ev.nationality
@@ -322,7 +322,6 @@ def update_source(source, new_entries, source_date, download_url):
     existing = {r[0]: {"entity_id": r[1], "version_id": r[2], "name": r[3],
                         "program": r[4], "dob": r[5], "nationality": r[6]} for r in cur.fetchall()}
 
-    # Hämta befintliga sub-data per version_id för fingerprint-jämförelse
     existing_ids = set(existing.keys())
     new_ids      = set(new_entries.keys())
     added_ids    = new_ids - existing_ids
@@ -332,6 +331,48 @@ def update_source(source, new_entries, source_date, download_url):
     print(f"  Tillagda:   {len(added_ids)}")
     print(f"  Borttagna:  {len(removed_ids)}")
     print(f"  Gemensamma: {len(common_ids)}")
+
+    # Hämta sub-data för befintliga entiteter (för fingerprint-jämförelse)
+    existing_aliases   = {}
+    existing_addresses = {}
+    existing_docs      = {}
+    if common_ids:
+        existing_version_ids = [existing[cid]["version_id"] for cid in common_ids]
+        cur.execute("SELECT entity_version_id, full_name, name_type FROM name WHERE entity_version_id = ANY(%s::uuid[])", (existing_version_ids,))
+        for r in cur.fetchall():
+            if r[2] != "primary":
+                existing_aliases.setdefault(str(r[0]), []).append(r[1])
+        cur.execute("SELECT entity_version_id, full_address FROM address WHERE entity_version_id = ANY(%s::uuid[])", (existing_version_ids,))
+        for r in cur.fetchall():
+            existing_addresses.setdefault(str(r[0]), []).append(r[1])
+        cur.execute("SELECT entity_version_id, doc_type, doc_number, issuing_country FROM document WHERE entity_version_id = ANY(%s::uuid[])", (existing_version_ids,))
+        for r in cur.fetchall():
+            existing_docs.setdefault(str(r[0]), []).append({"type": r[1], "number": r[2], "country": r[3] or ""})
+
+    # Beräkna vilka common_ids som faktiskt ändrats
+    actually_changed = set()
+    for cid in common_ids:
+        exst    = existing[cid]
+        e       = new_entries[cid]
+        vid_old = exst["version_id"]
+        old_fp  = sha256(json.dumps({
+            "name":        exst["name"],
+            "program":     exst["program"],
+            "dob":         exst["dob"],
+            "nationality": exst["nationality"],
+            "aliases":     sorted(existing_aliases.get(vid_old, [])),
+            "addresses":   sorted(existing_addresses.get(vid_old, [])),
+            "documents":   sorted([f"{d['type']}:{d['number']}:{d['country']}" for d in existing_docs.get(vid_old, [])]),
+        }, sort_keys=True))
+        if old_fp != e["_fingerprint"]:
+            actually_changed.add(cid)
+
+    # Om ingenting ändrats — ingen ny snapshot
+    if not added_ids and not removed_ids and not actually_changed:
+        print("  Inga faktiska ändringar hittades. Avslutar.")
+        print(f"STATUS:no_change:{source}")
+        conn.close()
+        return
 
     # Skapa snapshot
     cur.execute("""
@@ -386,7 +427,6 @@ def update_source(source, new_entries, source_date, download_url):
             cur.execute("UPDATE entity SET is_active = true WHERE id = ANY(%s::uuid[])", (reactivate_ids,))
         conn.commit()
 
-        # Hämta faktiska id:n
         cur.execute("SELECT canonical_id, id FROM entity WHERE source = %s AND canonical_id = ANY(%s)",
                     (source, list(added_ids)))
         eid_map = {r[0]: str(r[1]) for r in cur.fetchall()}
@@ -416,26 +456,6 @@ def update_source(source, new_entries, source_date, download_url):
         print(f"  Tillagda: {len(added_ids)} ({time.time()-t0:.1f}s)")
 
     # ── ÄNDRADE ───────────────────────────────────────────────────────────────
-    # Hämta befintliga sub-data för fingerprint-jämförelse
-    if common_ids:
-        existing_version_ids = [existing[cid]["version_id"] for cid in common_ids]
-        cur.execute("SELECT entity_version_id, full_name, name_type FROM name WHERE entity_version_id = ANY(%s::uuid[])", (existing_version_ids,))
-        existing_aliases = {}
-        for r in cur.fetchall():
-            vid = str(r[0])
-            if r[2] != "primary":
-                existing_aliases.setdefault(vid, []).append(r[1])
-
-        cur.execute("SELECT entity_version_id, full_address FROM address WHERE entity_version_id = ANY(%s::uuid[])", (existing_version_ids,))
-        existing_addresses = {}
-        for r in cur.fetchall():
-            existing_addresses.setdefault(str(r[0]), []).append(r[1])
-
-        cur.execute("SELECT entity_version_id, doc_type, doc_number, issuing_country FROM document WHERE entity_version_id = ANY(%s::uuid[])", (existing_version_ids,))
-        existing_docs = {}
-        for r in cur.fetchall():
-            existing_docs.setdefault(str(r[0]), []).append({"type": r[1], "number": r[2], "country": r[3] or ""})
-
     t0 = time.time()
     changed_version_ids = []; changed_entity_data = []
     mod_ev_rows = []; mod_name_rows = []; mod_addr_rows = []; mod_doc_rows = []
@@ -444,40 +464,18 @@ def update_source(source, new_entries, source_date, download_url):
     WATCH = [("name","name","name"), ("program","program","program"),
              ("dob","dob","dob"), ("nationality","nationality","nationality")]
 
-    for cid in common_ids:
-        e    = new_entries[cid]
-        exst = existing[cid]
+    for cid in actually_changed:
+        e       = new_entries[cid]
+        exst    = existing[cid]
         vid_old = exst["version_id"]
 
-        # Bygg befintligt fingerprint från DB-data
-        old_entry = {
-            "name":        exst["name"],
-            "program":     exst["program"],
-            "dob":         exst["dob"],
-            "nationality": exst["nationality"],
-            "aliases":     existing_aliases.get(vid_old, []),
-            "addresses":   existing_addresses.get(vid_old, []),
-            "documents":   existing_docs.get(vid_old, []),
-        }
-        old_fp = sha256(json.dumps({
-            "name":        old_entry["name"],
-            "program":     old_entry["program"],
-            "dob":         old_entry["dob"],
-            "nationality": old_entry["nationality"],
-            "aliases":     sorted(old_entry["aliases"]),
-            "addresses":   sorted(old_entry["addresses"]),
-            "documents":   sorted([f"{d['type']}:{d['number']}:{d['country']}" for d in old_entry["documents"]]),
-        }, sort_keys=True))
-
-        if old_fp == e["_fingerprint"]:
-            continue  # Inget ändrat
-
-        # Hitta specifika fält som ändrats för delta_log
         changed_fields = [(label, exst.get(ok), e.get(nk)) for label, ok, nk in WATCH if exst.get(ok) != e.get(nk)]
-        if old_entry["aliases"] != sorted(e.get("aliases", [])):
-            changed_fields.append(("aliases", str(sorted(old_entry["aliases"])), str(sorted(e.get("aliases", [])))))
-        if old_entry["addresses"] != sorted(e.get("addresses", [])):
-            changed_fields.append(("addresses", str(sorted(old_entry["addresses"])), str(sorted(e.get("addresses", [])))))
+        old_aliases   = sorted(existing_aliases.get(vid_old, []))
+        old_addresses = sorted(existing_addresses.get(vid_old, []))
+        if old_aliases != sorted(e.get("aliases", [])):
+            changed_fields.append(("aliases", str(old_aliases), str(sorted(e.get("aliases", [])))))
+        if old_addresses != sorted(e.get("addresses", [])):
+            changed_fields.append(("addresses", str(old_addresses), str(sorted(e.get("addresses", [])))))
 
         changed_version_ids.append(vid_old)
         changed_entity_data.append((e.get("name"), exst["entity_id"]))
@@ -512,7 +510,8 @@ def update_source(source, new_entries, source_date, download_url):
     if mod_doc_rows:
         execute_values(cur, "INSERT INTO document (id,entity_version_id,doc_type,doc_number,issuing_country) VALUES %s", mod_doc_rows)
     conn.commit()
-    print(f"  Ändrade: {modified_count} ({time.time()-t0:.1f}s)")
+    if modified_count > 0:
+        print(f"  Ändrade: {modified_count} ({time.time()-t0:.1f}s)")
 
     # ── DELTA LOG ─────────────────────────────────────────────────────────────
     if delta_rows:
@@ -525,7 +524,7 @@ def update_source(source, new_entries, source_date, download_url):
 
     cur.close()
     conn.close()
-    added_count = len([d for d in delta_rows if d[3] == "added"])
+    added_count   = len([d for d in delta_rows if d[3] == "added"])
     removed_count = len([d for d in delta_rows if d[3] == "removed"])
     print(f"  Klar!")
     print(f"STATUS:done:{source}:added={added_count},removed={removed_count},modified={modified_count}")
