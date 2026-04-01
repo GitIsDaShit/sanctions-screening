@@ -604,9 +604,10 @@ function SanctionsScreening() {
   const loadList = (snapshotId) => {
     setListLoading(true);
     setListError(null);
+    const ts = Date.now();
     const url = snapshotId && snapshotId !== "latest"
-      ? "/.netlify/functions/sanctions?snapshot_id=" + snapshotId
-      : "/.netlify/functions/sanctions";
+      ? "/.netlify/functions/sanctions?snapshot_id=" + snapshotId + "&_=" + ts
+      : "/.netlify/functions/sanctions?_=" + ts;
     fetch(url)
       .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(data => { 
