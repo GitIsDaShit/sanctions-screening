@@ -604,10 +604,9 @@ function SanctionsScreening() {
   const loadList = (snapshotId) => {
     setListLoading(true);
     setListError(null);
-    const ts = Date.now();
     const url = snapshotId && snapshotId !== "latest"
-      ? "/.netlify/functions/sanctions?snapshot_id=" + snapshotId + "&_=" + ts
-      : "/.netlify/functions/sanctions?_=" + ts;
+      ? "/.netlify/functions/sanctions?snapshot_id=" + snapshotId
+      : "/.netlify/functions/sanctions";
     fetch(url)
       .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(data => { 
@@ -626,10 +625,20 @@ function SanctionsScreening() {
     loadList(null);
   }, []);
 
-  // Retry om listan är tom efter 3 sekunder (kan bero på CDN-caching)
+  // Retry med cache-busting om listan är tom efter 3 sekunder
   useEffect(() => {
     if (sanctionsList.length === 0 && !listLoading && !listError) {
-      const timer = setTimeout(() => loadList(null), 3000);
+      const timer = setTimeout(() => {
+        setListLoading(true);
+        fetch("/.netlify/functions/sanctions?_=" + Date.now())
+          .then(r => r.json())
+          .then(data => {
+            const entries = data.entries || data;
+            setSanctionsList(Array.isArray(entries) ? entries : []);
+            setListLoading(false);
+          })
+          .catch(() => setListLoading(false));
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [sanctionsList.length, listLoading, listError]);
