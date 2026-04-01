@@ -678,7 +678,7 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
   }).sort((a, b) => b.bestScore - a.bestScore);
 
   const topScore = grouped[0]?.bestScore ?? 0;
-  const EXAMPLES = ["Vladimir Putin", "Kim Jong Un", "Ivan Volkov", "Banco Nacional de Cuba", "Nord Stream", "Abdifatah Abdi"];
+  const EXAMPLES = ["Abdifatah Abdi", "Vladimir Putin", "Kim Jong Un", "Ivan Volkov", "Banco Nacional de Cuba", "Nord Stream"];
 
   return (
     <div style={{ maxWidth: 880, margin: "0 auto", padding: "28px 20px" }}>
