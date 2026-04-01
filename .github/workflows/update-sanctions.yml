@@ -44,13 +44,13 @@ jobs:
         env:
           SOURCE: ${{ github.event.inputs.source }}
         run: |
-          OUTPUT=$(python update_sanctions.py --source $SOURCE 2>&1)
-          echo "$OUTPUT"
-          # Parse STATUS lines from output
-          STATUS_LINE=$(echo "$OUTPUT" | grep "^STATUS:" | tail -1)
+          python update_sanctions.py --source $SOURCE > output.txt 2>&1 || true
+          cat output.txt
+          STATUS_LINE=$(grep "^STATUS:" output.txt | tail -1)
           if [ -z "$STATUS_LINE" ]; then
-            echo "job_status=done" >> $GITHUB_OUTPUT
-            echo "job_message=Update completed for $SOURCE" >> $GITHUB_OUTPUT
+            echo "job_status=error" >> $GITHUB_OUTPUT
+            echo "job_message=Script failed for $SOURCE — check logs" >> $GITHUB_OUTPUT
+            exit 1
           else
             KIND=$(echo "$STATUS_LINE" | cut -d: -f2)
             SRC=$(echo "$STATUS_LINE" | cut -d: -f3)
