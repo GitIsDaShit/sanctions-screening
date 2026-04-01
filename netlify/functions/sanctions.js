@@ -162,24 +162,55 @@ export default async (req) => {
     }
 
 
-    const params = snapshotId ? { p_snapshot_id: snapshotId } : {};
+    // Hämta detaljer (adresser, dokument) för en specifik entitet on-demand
+    if (action === "detail") {
+      const entityId = url.searchParams.get("entity_id");
+      if (!entityId) return new Response(JSON.stringify({ error: "Missing entity_id" }), { status: 400, headers: { "Content-Type": "application/json" } });
+
+      // Hämta aktiv version
+      const evRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/entity_version?select=id&entity_id=eq.${entityId}&valid_to=is.null&limit=1`,
+        { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }
+      );
+      const evRows = await evRes.json();
+      const versionId = evRows?.[0]?.id;
+      if (!versionId) return new Response(JSON.stringify({ addresses: [], passports: [], national_ids: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+      const [addrRes, docRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/address?select=full_address&entity_version_id=eq.${versionId}`,
+          { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }),
+        fetch(`${SUPABASE_URL}/rest/v1/document?select=doc_type,doc_number,issuing_country&entity_version_id=eq.${versionId}`,
+          { headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}` } }),
+      ]);
+
+      const addresses = (await addrRes.json()).map(a => a.full_address);
+      const docs = await docRes.json();
+      const passports    = docs.filter(d => d.doc_type === "passport").map(d => ({ number: d.doc_number, country: d.issuing_country }));
+      const national_ids = docs.filter(d => d.doc_type !== "passport").map(d => ({ number: d.doc_number, country: d.issuing_country }));
+
+      return new Response(JSON.stringify({ addresses, passports, national_ids }), {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
+      });
+    }
+
+
     const rows = await rpc("get_sanctions_entries", params);
 
     const entries = rows.map(r => ({
-      id:           r.canonical_id,
-      name:         r.primary_name,
-      type:         r.entity_type,
-      program:      r.program,
-      nationality:  r.nationality,
-      dob:          r.dob,
-      pob:          r.pob,
-      gender:       r.gender,
-      title:        r.title,
-      source:       r.source,
-      aliases:      r.aliases      || [],
-      addresses:    r.addresses    || [],
-      passports:    r.passports    || [],
-      national_ids: r.national_ids || [],
+      id:          r.canonical_id,
+      entity_uuid: r.id,
+      name:        r.primary_name,
+      type:        r.entity_type,
+      program:     r.program,
+      nationality: r.nationality,
+      dob:         r.dob,
+      pob:         r.pob,
+      gender:      r.gender,
+      title:       r.title,
+      source:      r.source,
+      aliases:     r.aliases || [],
+      // addresses, passports, national_ids laddas on-demand via ?action=detail
     }));
 
     return new Response(JSON.stringify({

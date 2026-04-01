@@ -584,6 +584,15 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
   const [hasSearched, setHasSearched] = useState(false);
   const [threshold, setThreshold] = useState(80);
   const [expanded, setExpanded] = useState(null);
+  const [details, setDetails] = useState({}); // entity_uuid -> {addresses, passports, national_ids}
+
+  const loadDetail = (entityUuid) => {
+    if (!entityUuid || details[entityUuid]) return;
+    fetch("/.netlify/functions/sanctions?action=detail&entity_id=" + entityUuid)
+      .then(r => r.json())
+      .then(d => setDetails(prev => ({ ...prev, [entityUuid]: d })))
+      .catch(() => {});
+  };
   const [showConfig, setShowConfig] = useState(true);
   const [entityFilter, setEntityFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
@@ -895,7 +904,7 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
               const programDesc = getProgramLabel(r.program);
               return (
                 <div key={group.key} style={{ animationDelay: i * 30 + "ms", background: risk.bg, border: "1.5px solid " + risk.border, borderRadius: 10, overflow: "hidden" }}>
-                  <div onClick={() => setExpanded(isOpen ? null : group.key)} style={{ padding: "15px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
+                  <div onClick={() => { const opening = expanded !== group.key; setExpanded(opening ? group.key : null); if (opening) group.hits.forEach(h => loadDetail(h.entity_uuid)); }} style={{ padding: "15px 18px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
                     <div style={{ width: 54, height: 54, borderRadius: "50%", background: "#fff", border: "2px solid " + risk.border, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       <span style={{ fontSize: 17, fontWeight: 700, color: risk.scoreColor, lineHeight: 1 }}>{group.bestScore}</span>
                       <span style={{ fontSize: 9, color: "#9ca3af" }}>/ 100</span>
@@ -961,24 +970,29 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
                               {r.aliases.map((a, i) => <div key={i} style={{ fontSize: 13, color: "#374151", padding: "3px 0", borderBottom: "1px solid #f3f4f6" }}>{a}</div>)}
                             </div>
                           )}
-                          {r.addresses?.length > 0 && (
-                            <div style={{ marginBottom: 14 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>ADDRESSES</div>
-                              {r.addresses.map((a, i) => <div key={i} style={{ fontSize: 13, color: "#374151", padding: "3px 0", borderBottom: "1px solid #f3f4f6" }}>📍 {a}</div>)}
-                            </div>
-                          )}
-                          {r.passports?.length > 0 && (
-                            <div style={{ marginBottom: 14 }}>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>PASSPORTS</div>
-                              {r.passports.map((p, i) => <div key={i} style={{ fontSize: 13, color: "#374151" }}>🛂 {p.number} ({p.country})</div>)}
-                            </div>
-                          )}
-                          {r.national_ids?.length > 0 && (
-                            <div>
-                              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>ID NUMBERS</div>
-                              {r.national_ids.map((n, i) => <div key={i} style={{ fontSize: 13, color: "#374151" }}>🪲 {n.number}{n.country ? " (" + n.country + ")" : ""}</div>)}
-                            </div>
-                          )}
+                          {(() => {
+                            const d = details[r.entity_uuid] || {};
+                            return (<>
+                              {d.addresses?.length > 0 && (
+                                <div style={{ marginBottom: 14 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>ADDRESSES</div>
+                                  {d.addresses.map((a, i) => <div key={i} style={{ fontSize: 13, color: "#374151", padding: "3px 0", borderBottom: "1px solid #f3f4f6" }}>📍 {a}</div>)}
+                                </div>
+                              )}
+                              {d.passports?.length > 0 && (
+                                <div style={{ marginBottom: 14 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>PASSPORTS</div>
+                                  {d.passports.map((p, i) => <div key={i} style={{ fontSize: 13, color: "#374151" }}>🛂 {p.number} ({p.country})</div>)}
+                                </div>
+                              )}
+                              {d.national_ids?.length > 0 && (
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1, marginBottom: 8 }}>ID NUMBERS</div>
+                                  {d.national_ids.map((n, i) => <div key={i} style={{ fontSize: 13, color: "#374151" }}>🪪 {n.number}{n.country ? " (" + n.country + ")" : ""}</div>)}
+                                </div>
+                              )}
+                            </>);
+                          })()}
                         </div>
                       </div>
                       <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 16 }}>
