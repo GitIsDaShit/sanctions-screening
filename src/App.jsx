@@ -576,7 +576,7 @@ function ListManagement({ reloadList }) {
 }
 
 // ── Sanctions Screening View ──────────────────────────────────────────────────
-function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList }) {
+function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList, loadList }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [aiAnalysis, setAiAnalysis] = useState(null);
@@ -1070,11 +1070,14 @@ export default function App() {
     }
   }, [sanctionsList.length, listLoading, listError]);
 
-  const reloadList = () => {
+  const loadList = (snapshotId) => {
     setListLoading(true);
     setListError(null);
-    fetch("/.netlify/functions/sanctions?_=" + Date.now())
-      .then(r => r.json())
+    const url = snapshotId
+      ? "/.netlify/functions/sanctions?snapshot_id=" + snapshotId + "&_=" + Date.now()
+      : "/.netlify/functions/sanctions?_=" + Date.now();
+    fetch(url)
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(data => {
         const entries = data.entries || data;
         setSanctionsList(Array.isArray(entries) ? entries : []);
@@ -1082,6 +1085,8 @@ export default function App() {
       })
       .catch(err => { setListError(err.message); setListLoading(false); });
   };
+
+  const reloadList = () => loadList(null);
 
   return (
     <div style={{ minHeight: "100vh", background: "#f3f4f6", fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -1123,7 +1128,7 @@ export default function App() {
       </div>
 
       {/* Page content */}
-      {page === "screening"  && <SanctionsScreening sanctionsList={sanctionsList} listLoading={listLoading} listError={listError} reloadList={reloadList} />}
+      {page === "screening"  && <SanctionsScreening sanctionsList={sanctionsList} listLoading={listLoading} listError={listError} reloadList={reloadList} loadList={loadList} />}
       {page === "management" && <ListManagement sanctionsList={sanctionsList} reloadList={reloadList} />}
 
       {/* Footer */}
