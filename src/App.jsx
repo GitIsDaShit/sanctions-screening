@@ -236,7 +236,7 @@ function ListManagement() {
   const [deltaSection, setDeltaSection] = useState("added");
 
   useEffect(() => {
-    fetch("/.netlify/functions/sanctions?action=snapshots")
+    fetch("/.netlify/functions/sanctions?action=snapshots&_=" + Date.now())
       .then(r => r.json())
       .then(d => { setSnapshots(d.snapshots || []); setLoading(false); })
       .catch(() => setLoading(false));
@@ -279,7 +279,7 @@ function ListManagement() {
             setUpdateStatus(prev => ({ ...prev, [source]: job.status }));
             clearInterval(poll);
             if (job.status === "done") {
-              fetch("/.netlify/functions/sanctions?action=snapshots")
+              fetch("/.netlify/functions/sanctions?action=snapshots&_=" + Date.now())
                 .then(r => r.json())
                 .then(d => setSnapshots(d.snapshots || []));
             }

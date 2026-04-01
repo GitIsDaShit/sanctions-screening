@@ -48,7 +48,7 @@ export default async (req) => {
       const snapshots = await res.json();
       return new Response(JSON.stringify({ snapshots }), {
         status: 200,
-        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache" },
       });
     }
 
@@ -117,7 +117,7 @@ export default async (req) => {
 
       return new Response(JSON.stringify({ delta: results }), {
         status: 200,
-        headers: { "Content-Type": "application/json", "Cache-Control": "public, max-age=300" },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache" },
       });
     }
 
