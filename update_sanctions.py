@@ -81,8 +81,8 @@ def fingerprint(e):
         "program":     e.get("program"),
         "dob":         e.get("dob"),
         "nationality": e.get("nationality"),
-        "aliases":     sorted(e.get("aliases", [])),
-        "addresses":   sorted(e.get("addresses", [])),
+        "aliases":     sorted(e.get("aliases", []), key=lambda x: x.lower()),
+        "addresses":   sorted(e.get("addresses", []), key=lambda x: x.lower()),
         "documents":   sorted([f"{d['type']}:{d['number']}:{d['country']}" for d in e.get("documents", [])]),
     }, sort_keys=True))
 
@@ -175,7 +175,8 @@ def load_eu_entries():
         dob_str = pob_str = None
         for bd in el.findall(tag("birthdate")):
             if not dob_str:
-                dob_str = bd.get("birthdate", "") or bd.get("year", "") or None
+                d = bd.get("birthdate", "") or bd.get("year", "")
+                dob_str = d if d else None
             if not pob_str:
                 city = bd.get("city", "").strip()
                 country = bd.get("countryDescription", "").strip()
@@ -373,7 +374,6 @@ def update_source(source, new_entries, source_date, download_url):
         print(f"STATUS:no_change:{source}")
         conn.close()
         return
-
     # Skapa snapshot
     cur.execute("""
         INSERT INTO list_snapshot (source, snapshot_date, version_hash, entity_count, download_url, fetched_at)
