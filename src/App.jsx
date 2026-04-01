@@ -1053,6 +1053,160 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
 }
 
 // ── Main App ──────────────────────────────────────────────────────────────────
+// ── Adverse Media ─────────────────────────────────────────────────────────────
+const CATEGORY_COLORS = {
+  "Sanctions":        { bg: "#fef2f2", border: "#fca5a5", text: "#dc2626" },
+  "Corruption":       { bg: "#fff7ed", border: "#fdba74", text: "#ea580c" },
+  "Money Laundering": { bg: "#fefce8", border: "#fde047", text: "#ca8a04" },
+  "Terrorism":        { bg: "#fdf2f8", border: "#f0abfc", text: "#9333ea" },
+  "Fraud":            { bg: "#fff7ed", border: "#fdba74", text: "#ea580c" },
+  "Criminal":         { bg: "#fef2f2", border: "#fca5a5", text: "#dc2626" },
+  "Regulatory":       { bg: "#eff6ff", border: "#93c5fd", text: "#2563eb" },
+  "Negative News":    { bg: "#f9fafb", border: "#d1d5db", text: "#374151" },
+};
+
+function AdverseMedia() {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
+  const search = async () => {
+    if (!query.trim()) return;
+    setLoading(true);
+    setError(null);
+    setResults(null);
+    setCategoryFilter("all");
+    try {
+      const res = await fetch("/.netlify/functions/adverse-media?q=" + encodeURIComponent(query.trim()));
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      setResults(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const categories = results ? [...new Set(results.articles.map(a => a.category))] : [];
+  const filtered = results ? (categoryFilter === "all" ? results.articles : results.articles.filter(a => a.category === categoryFilter)) : [];
+
+  const formatDate = (d) => {
+    if (!d) return "";
+    try { return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); }
+    catch { return d?.slice(0, 10) || ""; }
+  };
+
+  return (
+    <div style={{ maxWidth: 880, margin: "0 auto", padding: "28px 20px" }}>
+      {/* Search */}
+      <div style={{ background: "#fff", borderRadius: 12, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.08)", marginBottom: 20 }}>
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "#111827", marginBottom: 4 }}>Adverse Media Search</div>
+          <div style={{ fontSize: 12, color: "#6b7280" }}>Search for negative news, sanctions, corruption, fraud and criminal activity</div>
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && search()}
+            placeholder="Enter name to search..."
+            style={{ flex: 1, padding: "11px 14px", fontSize: 15, border: "1.5px solid #d1d5db", borderRadius: 8, color: "#111827", fontFamily: "inherit" }} />
+          <button onClick={search} disabled={loading || !query.trim()} style={{
+            padding: "11px 24px", background: loading ? "#9ca3af" : "#1e3a5f", color: "#fff",
+            border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600,
+            cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8,
+          }}>
+            {loading ? <><Spinner size={14} color="#fff" /> Searching...</> : "🔍 Search"}
+          </button>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+          <span style={{ fontSize: 12, color: "#9ca3af", alignSelf: "center" }}>Try:</span>
+          {["Vladimir Putin", "Kim Jong Un", "Abdifatah Abdi", "Banco Nacional de Cuba"].map(name => (
+            <button key={name} onClick={() => { setQuery(name); }} style={{ padding: "4px 12px", background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 20, fontSize: 12, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}>{name}</button>
+          ))}
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10, padding: "12px 18px", color: "#dc2626", fontSize: 13, marginBottom: 16 }}>
+          ⚠ {error}
+        </div>
+      )}
+
+      {results && (
+        <>
+          {/* Summary */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <div style={{ fontSize: 13, color: "#374151" }}>
+              <strong>{results.total}</strong> results for <strong>"{results.query}"</strong>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setCategoryFilter("all")} style={{
+                padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                background: categoryFilter === "all" ? "#1e3a5f" : "#f3f4f6",
+                color: categoryFilter === "all" ? "#fff" : "#374151",
+                border: categoryFilter === "all" ? "none" : "1px solid #e5e7eb",
+              }}>All {results.total}</button>
+              {categories.map(cat => {
+                const col = CATEGORY_COLORS[cat] || CATEGORY_COLORS["Negative News"];
+                const count = results.articles.filter(a => a.category === cat).length;
+                return (
+                  <button key={cat} onClick={() => setCategoryFilter(cat)} style={{
+                    padding: "4px 12px", borderRadius: 20, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                    background: categoryFilter === cat ? col.text : col.bg,
+                    color: categoryFilter === cat ? "#fff" : col.text,
+                    border: "1px solid " + col.border,
+                  }}>{cat} {count}</button>
+                );
+              })}
+            </div>
+          </div>
+
+          {filtered.length === 0 && (
+            <div style={{ background: "#f9fafb", borderRadius: 10, padding: 32, textAlign: "center", color: "#6b7280", fontSize: 14 }}>
+              No results found for this category.
+            </div>
+          )}
+
+          {/* Articles */}
+          {filtered.map((a, i) => {
+            const col = CATEGORY_COLORS[a.category] || CATEGORY_COLORS["Negative News"];
+            return (
+              <div key={i} style={{ background: "#fff", borderRadius: 10, padding: "16px 20px", marginBottom: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #f3f4f6" }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: col.bg, color: col.text, border: "1px solid " + col.border }}>{a.category}</span>
+                      <span style={{ fontSize: 11, color: "#9ca3af" }}>{a.outlet}</span>
+                      <span style={{ fontSize: 11, color: "#9ca3af" }}>·</span>
+                      <span style={{ fontSize: 11, color: "#9ca3af" }}>{formatDate(a.publishedAt)}</span>
+                      <span style={{ fontSize: 10, color: "#d1d5db", marginLeft: "auto" }}>{a.source}</span>
+                    </div>
+                    <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14, fontWeight: 600, color: "#111827", textDecoration: "none", lineHeight: 1.4, display: "block", marginBottom: 4 }}>
+                      {a.title}
+                    </a>
+                    {a.description && (
+                      <div style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>{a.description.slice(0, 200)}{a.description.length > 200 ? "..." : ""}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {results.total === 0 && (
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: 32, textAlign: "center" }}>
+              <div style={{ fontSize: 24, marginBottom: 8 }}>✓</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "#166534" }}>No adverse media found</div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>No negative news articles found for "{results.query}"</div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [page, setPage] = useState("management");
   const [sanctionsList, setSanctionsList] = useState([]);
@@ -1144,6 +1298,7 @@ export default function App() {
             {[
               { key: "screening",   label: "Sanctions Screening", icon: "🔍" },
               { key: "management",  label: "List Management",     icon: "📊" },
+              { key: "adverse",     label: "Adverse Media",       icon: "📰" },
             ].map(({ key, label, icon }) => (
               <button key={key} onClick={() => setPage(key)} style={{
                 padding: "16px 20px", background: page === key ? "rgba(255,255,255,0.12)" : "transparent",
@@ -1160,6 +1315,7 @@ export default function App() {
       {/* Page content */}
       {page === "screening"  && <SanctionsScreening sanctionsList={sanctionsList} listLoading={listLoading} listError={listError} reloadList={reloadList} loadList={loadList} />}
       {page === "management" && <ListManagement sanctionsList={sanctionsList} reloadList={reloadList} />}
+      {page === "adverse"    && <AdverseMedia />}
 
       {/* Footer */}
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px 40px" }}>
