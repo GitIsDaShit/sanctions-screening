@@ -12,7 +12,7 @@ export default async (req) => {
     const articles = [];
     const seen = new Set();
 
-    // NewsAPI — sök bara på namn (inga adverse keywords krav)
+    // NewsAPI — sök på namn
     if (NEWS_API_KEY) {
       try {
         const newsRes = await fetch(
@@ -36,30 +36,9 @@ export default async (req) => {
           }
         }
       } catch (e) { console.error("NewsAPI error:", e.message); }
+    } else {
+      return new Response(JSON.stringify({ error: "NEWS_API_KEY not configured" }), { status: 500, headers: { "Content-Type": "application/json" } });
     }
-
-    // GDELT — sök på namn utan krav på adverse keywords
-    try {
-      const gdeltRes = await fetch(
-        `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=artlist&maxrecords=15&format=json&timespan=24m`
-      );
-      const gdeltData = await gdeltRes.json();
-      if (gdeltData.articles) {
-        for (const a of gdeltData.articles) {
-          if (!a.title || seen.has(a.url)) continue;
-          seen.add(a.url);
-          articles.push({
-            source:      "GDELT",
-            title:       a.title,
-            description: "",
-            url:         a.url,
-            publishedAt: a.seendate,
-            outlet:      a.domain || "",
-            category:    categorize(a.title),
-          });
-        }
-      }
-    } catch (e) { console.error("GDELT error:", e.message); }
 
     // Sortera — adverse-kategorier först, sedan datum
     const categoryOrder = ["Sanctions","Terrorism","Criminal","Corruption","Money Laundering","Fraud","Regulatory","Negative News","Other"];
