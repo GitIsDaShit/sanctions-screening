@@ -720,7 +720,16 @@ function SanctionsScreening() {
   return (
     <div style={{ maxWidth: 880, margin: "0 auto", padding: "28px 20px" }}>
 
-      {/* Search card */}
+      {/* Empty state warning */}
+      {sanctionsList.length === 0 && !listLoading && (
+        <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12, fontSize: 13, color: "#92400e" }}>
+          ⚠ Sanctions list not loaded.
+          <button onClick={() => { setListLoading(true); fetch("/.netlify/functions/sanctions?_=" + Date.now()).then(r=>r.json()).then(d=>{ setSanctionsList(Array.isArray(d.entries) ? d.entries : []); setListLoading(false); }).catch(()=>setListLoading(false)); }}
+            style={{ marginLeft: "auto", padding: "5px 14px", background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+            ↻ Reload
+          </button>
+        </div>
+      )}
       <div style={{ background: "#fff", borderRadius: 12, padding: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", marginBottom: 20 }}>
         <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
           <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && runScreen()}
