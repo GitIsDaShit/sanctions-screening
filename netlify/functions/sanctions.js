@@ -157,7 +157,7 @@ export default async (req) => {
       const job = rows[0] || null;
       return new Response(JSON.stringify({ job }), {
         status: 200,
-        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache" },
       });
     }
 
@@ -187,7 +187,7 @@ export default async (req) => {
       entries,
     }), {
       status: 200,
-      headers: { "Content-Type": "application/json", "Cache-Control": "no-cache" },
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache" },
     });
 
   } catch (err) {

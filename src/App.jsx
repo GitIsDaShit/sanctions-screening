@@ -619,12 +619,20 @@ function SanctionsScreening() {
   };
 
   useEffect(() => {
-    fetch("/.netlify/functions/sanctions?action=snapshots")
+    fetch("/.netlify/functions/sanctions?action=snapshots&_=" + Date.now())
       .then(r => r.json())
       .then(data => setSnapshots(data.snapshots || []))
       .catch(() => {});
     loadList(null);
   }, []);
+
+  // Retry om listan är tom efter 3 sekunder (kan bero på CDN-caching)
+  useEffect(() => {
+    if (sanctionsList.length === 0 && !listLoading && !listError) {
+      const timer = setTimeout(() => loadList(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [sanctionsList.length, listLoading, listError]);
 
   useEffect(() => {
     if (!hasSearched || !query.trim() || sanctionsList.length === 0) return;
