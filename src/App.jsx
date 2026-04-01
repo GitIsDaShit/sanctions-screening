@@ -1024,7 +1024,7 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
 
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const [page, setPage] = useState("screening");
+  const [page, setPage] = useState("management");
   const [sanctionsList, setSanctionsList] = useState([]);
   const [listLoading, setListLoading] = useState(true);
   const [listError, setListError] = useState(null);
