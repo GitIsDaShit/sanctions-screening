@@ -599,6 +599,8 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
   const [activeSource, setActiveSource] = useState({});
   const [snapshots, setSnapshots] = useState([]);
   const [selectedSnapshot, setSelectedSnapshot] = useState("latest");
+  const [snapshotList, setSnapshotList] = useState(null); // null = use global sanctionsList
+  const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [weights, setWeights] = useState({
     jw: true,  jwVal: 25, ts: true,  tsVal: 25,
     lev: true, levVal: 15, ngr: true, ngrVal: 20, mph: true, mphVal: 15,
@@ -606,7 +608,8 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
 
   const setWeight = (key, val) => setWeights(w => ({ ...w, [key]: val }));
   const activeCount = [weights.jw, weights.ts, weights.lev, weights.ngr, weights.mph].filter(Boolean).length;
-  const filteredList = entityFilter === "all" ? sanctionsList : sanctionsList.filter(e => e.type === entityFilter);
+  const activeList = snapshotList ?? sanctionsList;
+  const filteredList = entityFilter === "all" ? activeList : activeList.filter(e => e.type === entityFilter);
 
   useEffect(() => {
     fetch("/.netlify/functions/sanctions?action=snapshots&_=" + Date.now())
@@ -616,21 +619,21 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
   }, []);
 
   useEffect(() => {
-    if (!hasSearched || !query.trim() || sanctionsList.length === 0) return;
-    const list = entityFilter === "all" ? sanctionsList : sanctionsList.filter(e => e.type === entityFilter);
+    if (!hasSearched || !query.trim() || activeList.length === 0) return;
+    const list = entityFilter === "all" ? activeList : activeList.filter(e => e.type === entityFilter);
     setResults(screenName(query.trim(), list, weights));
     setExpanded(null);
   }, [entityFilter]);
 
   useEffect(() => {
-    if (!hasSearched || !query.trim() || sanctionsList.length === 0) return;
-    const list = entityFilter === "all" ? sanctionsList : sanctionsList.filter(e => e.type === entityFilter);
+    if (!hasSearched || !query.trim() || activeList.length === 0) return;
+    const list = entityFilter === "all" ? activeList : activeList.filter(e => e.type === entityFilter);
     const timer = setTimeout(() => { setResults(screenName(query.trim(), list, weights)); setExpanded(null); }, 300);
     return () => clearTimeout(timer);
   }, [weights]);
 
   const runScreen = () => {
-    if (!query.trim() || sanctionsList.length === 0) return;
+    if (!query.trim() || activeList.length === 0) return;
     setResults(screenName(query.trim(), filteredList, weights));
     setHasSearched(true);
     setAiAnalysis(null);
@@ -738,10 +741,10 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>SOURCE</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                   {[
-                    { value: "all", label: "All", count: sanctionsList.length },
-                    { value: "OFAC", label: "OFAC", count: sanctionsList.filter(e => e.source === "OFAC").length },
-                    { value: "EU", label: "EU", count: sanctionsList.filter(e => e.source === "EU").length },
-                    { value: "UN", label: "UN", count: sanctionsList.filter(e => e.source === "UN").length },
+                    { value: "all", label: "All", count: activeList.length },
+                    { value: "OFAC", label: "OFAC", count: activeList.filter(e => e.source === "OFAC").length },
+                    { value: "EU", label: "EU", count: activeList.filter(e => e.source === "EU").length },
+                    { value: "UN", label: "UN", count: activeList.filter(e => e.source === "UN").length },
                   ].map(({ value, label, count }) => (
                     <button key={value} onClick={() => setSourceFilter(value)} style={{
                       padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
@@ -762,11 +765,11 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>ENTITY TYPE</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
                   {[
-                    { value: "all", label: "All", count: sanctionsList.length },
-                    { value: "individual", label: "Individuals", count: sanctionsList.filter(e => e.type === "individual").length },
-                    { value: "organization", label: "Orgs", count: sanctionsList.filter(e => e.type === "organization").length },
-                    { value: "vessel", label: "Vessels", count: sanctionsList.filter(e => e.type === "vessel").length },
-                    { value: "aircraft", label: "Aircraft", count: sanctionsList.filter(e => e.type === "aircraft").length },
+                    { value: "all", label: "All", count: activeList.length },
+                    { value: "individual", label: "Individuals", count: activeList.filter(e => e.type === "individual").length },
+                    { value: "organization", label: "Orgs", count: activeList.filter(e => e.type === "organization").length },
+                    { value: "vessel", label: "Vessels", count: activeList.filter(e => e.type === "vessel").length },
+                    { value: "aircraft", label: "Aircraft", count: activeList.filter(e => e.type === "aircraft").length },
                   ].map(({ value, label, count }) => (
                     <button key={value} onClick={() => setEntityFilter(value)} style={{
                       padding: "4px 10px", borderRadius: 6, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
@@ -798,9 +801,22 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", letterSpacing: 0.8, marginBottom: 8 }}>LIST VERSION</div>
                 <select value={selectedSnapshot} onChange={e => {
-                  setSelectedSnapshot(e.target.value);
-                  loadList(e.target.value === "latest" ? null : e.target.value);
+                  const val = e.target.value;
+                  setSelectedSnapshot(val);
                   setHasSearched(false); setResults([]);
+                  if (val === "latest") {
+                    setSnapshotList(null);
+                  } else {
+                    setSnapshotLoading(true);
+                    fetch("/.netlify/functions/sanctions?snapshot_id=" + val + "&_=" + Date.now())
+                      .then(r => r.json())
+                      .then(data => {
+                        const entries = data.entries || data;
+                        setSnapshotList(Array.isArray(entries) ? entries : null);
+                        setSnapshotLoading(false);
+                      })
+                      .catch(() => setSnapshotLoading(false));
+                  }
                 }} style={{ width: "100%", padding: "6px 10px", borderRadius: 6, fontSize: 12, border: "1.5px solid #cbd5e1", background: "#fff", color: "#374151", fontFamily: "inherit", cursor: "pointer" }}>
                   <option value="latest">Latest (current)</option>
                   {snapshots.length > 0 && (
@@ -1024,10 +1040,10 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
           <div style={{ fontSize: 16, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Enter a name to screen</div>
           <div style={{ fontSize: 13, color: "#9ca3af" }}>
             {listLoading ? "Loading sanctions lists..." : (() => {
-              const ofac = sanctionsList.filter(e => e.source === "OFAC").length;
-              const eu = sanctionsList.filter(e => e.source === "EU").length;
-              const un = sanctionsList.filter(e => e.source === "UN").length;
-              return "Screening against " + sanctionsList.length.toLocaleString("en-US") + " entities · OFAC " + ofac.toLocaleString("en-US") + " · EU " + eu.toLocaleString("en-US") + " · UN " + un.toLocaleString("en-US") + " · 5 algorithms + Infotrek AI";
+              const ofac = activeList.filter(e => e.source === "OFAC").length;
+              const eu = activeList.filter(e => e.source === "EU").length;
+              const un = activeList.filter(e => e.source === "UN").length;
+              return "Screening against " + activeList.length.toLocaleString("en-US") + " entities · OFAC " + ofac.toLocaleString("en-US") + " · EU " + eu.toLocaleString("en-US") + " · UN " + un.toLocaleString("en-US") + " · 5 algorithms + Infotrek AI";
             })()}
           </div>
         </div>
