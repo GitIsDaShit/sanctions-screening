@@ -1035,8 +1035,19 @@ export default function App() {
       .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(data => {
         const entries = data.entries || data;
-        setSanctionsList(Array.isArray(entries) ? entries : []);
-        setListLoading(false);
+        if (Array.isArray(entries) && entries.length > 0) {
+          setSanctionsList(entries);
+          setListLoading(false);
+        } else {
+          // Cachat svar var tomt — hämta färskt direkt
+          return fetch("/.netlify/functions/sanctions?_=" + Date.now())
+            .then(r => r.json())
+            .then(data2 => {
+              const entries2 = data2.entries || data2;
+              setSanctionsList(Array.isArray(entries2) ? entries2 : []);
+              setListLoading(false);
+            });
+        }
       })
       .catch(err => { setListError(err.message); setListLoading(false); });
   }, []);

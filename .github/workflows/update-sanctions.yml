@@ -46,6 +46,7 @@ jobs:
         run: |
           python update_sanctions.py --source $SOURCE > output.txt 2>&1 || true
           cat output.txt
+          python analyze.py
           STATUS_LINE=$(grep "^STATUS:" output.txt | tail -1)
           if [ -z "$STATUS_LINE" ]; then
             echo "job_status=error" >> $GITHUB_OUTPUT
