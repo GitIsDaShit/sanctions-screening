@@ -227,7 +227,7 @@ const Spinner = ({ size = 20, color = "#1e3a5f" }) => (
 );
 
 // ── List Management View ──────────────────────────────────────────────────────
-function ListManagement() {
+function ListManagement({ reloadList }) {
   const [snapshots, setSnapshots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deltaData, setDeltaData] = useState(null);
@@ -282,6 +282,7 @@ function ListManagement() {
               fetch("/.netlify/functions/sanctions?action=snapshots&_=" + Date.now())
                 .then(r => r.json())
                 .then(d => setSnapshots(d.snapshots || []));
+              if (reloadList) reloadList();
             }
           }
         } catch (e) {}
@@ -575,7 +576,7 @@ function ListManagement() {
 }
 
 // ── Sanctions Screening View ──────────────────────────────────────────────────
-function SanctionsScreening() {
+function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [aiAnalysis, setAiAnalysis] = useState(null);
@@ -583,9 +584,6 @@ function SanctionsScreening() {
   const [hasSearched, setHasSearched] = useState(false);
   const [threshold, setThreshold] = useState(80);
   const [expanded, setExpanded] = useState(null);
-  const [sanctionsList, setSanctionsList] = useState([]);
-  const [listLoading, setListLoading] = useState(true);
-  const [listError, setListError] = useState(null);
   const [showConfig, setShowConfig] = useState(true);
   const [entityFilter, setEntityFilter] = useState("all");
   const [sourceFilter, setSourceFilter] = useState("all");
@@ -601,47 +599,12 @@ function SanctionsScreening() {
   const activeCount = [weights.jw, weights.ts, weights.lev, weights.ngr, weights.mph].filter(Boolean).length;
   const filteredList = entityFilter === "all" ? sanctionsList : sanctionsList.filter(e => e.type === entityFilter);
 
-  const loadList = (snapshotId) => {
-    setListLoading(true);
-    setListError(null);
-    const url = snapshotId && snapshotId !== "latest"
-      ? "/.netlify/functions/sanctions?snapshot_id=" + snapshotId
-      : "/.netlify/functions/sanctions";
-    fetch(url)
-      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-      .then(data => { 
-        const entries = data.entries || data;
-        setSanctionsList(Array.isArray(entries) ? entries : []); 
-        setListLoading(false); 
-      })
-      .catch(err => { setListError(err.message); setListLoading(false); });
-  };
-
   useEffect(() => {
     fetch("/.netlify/functions/sanctions?action=snapshots&_=" + Date.now())
       .then(r => r.json())
       .then(data => setSnapshots(data.snapshots || []))
       .catch(() => {});
-    loadList(null);
   }, []);
-
-  // Retry med cache-busting om listan är tom efter 3 sekunder
-  useEffect(() => {
-    if (sanctionsList.length === 0 && !listLoading && !listError) {
-      const timer = setTimeout(() => {
-        setListLoading(true);
-        fetch("/.netlify/functions/sanctions?_=" + Date.now())
-          .then(r => r.json())
-          .then(data => {
-            const entries = data.entries || data;
-            setSanctionsList(Array.isArray(entries) ? entries : []);
-            setListLoading(false);
-          })
-          .catch(() => setListLoading(false));
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [sanctionsList.length, listLoading, listError]);
 
   useEffect(() => {
     if (!hasSearched || !query.trim() || sanctionsList.length === 0) return;
@@ -724,8 +687,7 @@ function SanctionsScreening() {
       {sanctionsList.length === 0 && !listLoading && (
         <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 18px", marginBottom: 16, display: "flex", alignItems: "center", gap: 12, fontSize: 13, color: "#92400e" }}>
           ⚠ Sanctions list not loaded.
-          <button onClick={() => { setListLoading(true); fetch("/.netlify/functions/sanctions?_=" + Date.now()).then(r=>r.json()).then(d=>{ setSanctionsList(Array.isArray(d.entries) ? d.entries : []); setListLoading(false); }).catch(()=>setListLoading(false)); }}
-            style={{ marginLeft: "auto", padding: "5px 14px", background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+          <button onClick={reloadList} style={{ marginLeft: "auto", padding: "5px 14px", background: "#1e3a5f", color: "#fff", border: "none", borderRadius: 6, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
             ↻ Reload
           </button>
         </div>
@@ -1063,6 +1025,52 @@ function SanctionsScreening() {
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState("screening");
+  const [sanctionsList, setSanctionsList] = useState([]);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState(null);
+
+  // Ladda sanctions-data en gång på App-nivå
+  useEffect(() => {
+    fetch("/.netlify/functions/sanctions")
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(data => {
+        const entries = data.entries || data;
+        setSanctionsList(Array.isArray(entries) ? entries : []);
+        setListLoading(false);
+      })
+      .catch(err => { setListError(err.message); setListLoading(false); });
+  }, []);
+
+  // Retry med cache-busting om listan är tom
+  useEffect(() => {
+    if (sanctionsList.length === 0 && !listLoading && !listError) {
+      const timer = setTimeout(() => {
+        setListLoading(true);
+        fetch("/.netlify/functions/sanctions?_=" + Date.now())
+          .then(r => r.json())
+          .then(data => {
+            const entries = data.entries || data;
+            setSanctionsList(Array.isArray(entries) ? entries : []);
+            setListLoading(false);
+          })
+          .catch(() => setListLoading(false));
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [sanctionsList.length, listLoading, listError]);
+
+  const reloadList = () => {
+    setListLoading(true);
+    setListError(null);
+    fetch("/.netlify/functions/sanctions?_=" + Date.now())
+      .then(r => r.json())
+      .then(data => {
+        const entries = data.entries || data;
+        setSanctionsList(Array.isArray(entries) ? entries : []);
+        setListLoading(false);
+      })
+      .catch(err => { setListError(err.message); setListLoading(false); });
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f3f4f6", fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -1104,8 +1112,8 @@ export default function App() {
       </div>
 
       {/* Page content */}
-      {page === "screening"  && <SanctionsScreening />}
-      {page === "management" && <ListManagement />}
+      {page === "screening"  && <SanctionsScreening sanctionsList={sanctionsList} listLoading={listLoading} listError={listError} reloadList={reloadList} />}
+      {page === "management" && <ListManagement sanctionsList={sanctionsList} reloadList={reloadList} />}
 
       {/* Footer */}
       <div style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px 40px" }}>
