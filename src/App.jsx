@@ -325,7 +325,7 @@ function ListManagement({ reloadList }) {
     <div style={{ maxWidth: 900, margin: "0 auto", padding: "32px 20px" }}>
 
       {/* Summary cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 32 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 32 }}>
         {["OFAC", "EU", "UN"].map(src => {
           const snaps = bySource[src] || [];
           const latest = snaps[0];
@@ -418,7 +418,8 @@ function ListManagement({ reloadList }) {
         {loading ? (
           <div style={{ padding: 40, display: "flex", justifyContent: "center" }}><Spinner /></div>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 500 }}>
             <thead>
               <tr style={{ background: "#f9fafb" }}>
                 {["Source", "Published date", "Loaded date", "Entities", "Version hash"].map(h => (
@@ -461,6 +462,7 @@ function ListManagement({ reloadList }) {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -523,7 +525,7 @@ function ListManagement({ reloadList }) {
                   </div>
                 )}
                 {/* Stat cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
                   {sectionCfg.map(cfg => (
                     <button key={cfg.key} onClick={() => setDeltaSection(cfg.key)} style={{
                       padding: "14px 16px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit", textAlign: "left",
@@ -901,7 +903,7 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
                 cursor: aiLoading ? "not-allowed" : "pointer",
                 fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8
               }}>
-                {aiLoading ? <><Spinner size={13} color="#6b7280" /> Analyzing...</> : "✦ AI Assessment"}
+                {aiLoading ? <><Spinner size={13} color="#6b7280" /> Analyzing...</> : "+ AI Assessment"}
               </button>
             )}
           </div>
