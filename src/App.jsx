@@ -621,22 +621,26 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
   }, []);
 
   useEffect(() => {
-    if (!hasSearched || !query.trim() || activeList.length === 0) return;
-    const list = entityFilter === "all" ? activeList : activeList.filter(e => e.type === entityFilter);
+    const currentList = snapshotList ?? sanctionsList;
+    if (!hasSearched || !query.trim() || currentList.length === 0) return;
+    const list = entityFilter === "all" ? currentList : currentList.filter(e => e.type === entityFilter);
     setResults(screenName(query.trim(), list, weights));
     setExpanded(null);
   }, [entityFilter]);
 
   useEffect(() => {
-    if (!hasSearched || !query.trim() || activeList.length === 0) return;
-    const list = entityFilter === "all" ? activeList : activeList.filter(e => e.type === entityFilter);
+    const currentList = snapshotList ?? sanctionsList;
+    if (!hasSearched || !query.trim() || currentList.length === 0) return;
+    const list = entityFilter === "all" ? currentList : currentList.filter(e => e.type === entityFilter);
     const timer = setTimeout(() => { setResults(screenName(query.trim(), list, weights)); setExpanded(null); }, 300);
     return () => clearTimeout(timer);
   }, [weights]);
 
   const runScreen = () => {
-    if (!query.trim() || activeList.length === 0) return;
-    setResults(screenName(query.trim(), filteredList, weights));
+    const currentList = snapshotList ?? sanctionsList;
+    const list = entityFilter === "all" ? currentList : currentList.filter(e => e.type === entityFilter);
+    if (!query.trim() || list.length === 0) return;
+    setResults(screenName(query.trim(), list, weights));
     setHasSearched(true);
     setAiAnalysis(null);
     setExpanded(null);
@@ -722,8 +726,10 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
           <span style={{ fontSize: 12, color: "#9ca3af", alignSelf: "center", marginRight: 2 }}>Try:</span>
           {EXAMPLES.map(name => (
             <button key={name} onClick={() => {
+              const currentList = snapshotList ?? sanctionsList;
+              const list = entityFilter === "all" ? currentList : currentList.filter(e => e.type === entityFilter);
               setQuery(name);
-              setResults(screenName(name, filteredList, weights));
+              setResults(screenName(name, list, weights));
               setHasSearched(true); setAiAnalysis(null); setExpanded(null);
             }} style={{ padding: "4px 12px", background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 20, fontSize: 12, color: "#374151", cursor: "pointer", fontFamily: "inherit" }}>{name}</button>
           ))}
