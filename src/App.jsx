@@ -601,8 +601,14 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
   const [activeSource, setActiveSource] = useState({});
   const [snapshots, setSnapshots] = useState([]);
   const [selectedSnapshot, setSelectedSnapshot] = useState("latest");
-  const [snapshotList, setSnapshotList] = useState(null); // null = use global sanctionsList
+  const [snapshotList, setSnapshotList] = useState(null);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
+  const snapshotListRef = useRef(null);
+
+  const setSnapshotListAndRef = (val) => {
+    snapshotListRef.current = val;
+    setSnapshotList(val);
+  };
   const [weights, setWeights] = useState({
     jw: true,  jwVal: 25, ts: true,  tsVal: 25,
     lev: true, levVal: 15, ngr: true, ngrVal: 20, mph: true, mphVal: 15,
@@ -621,7 +627,7 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
   }, []);
 
   useEffect(() => {
-    const currentList = snapshotList ?? sanctionsList;
+    const currentList = snapshotListRef.current ?? sanctionsList;
     if (!hasSearched || !query.trim() || currentList.length === 0) return;
     const list = entityFilter === "all" ? currentList : currentList.filter(e => e.type === entityFilter);
     setResults(screenName(query.trim(), list, weights));
@@ -629,7 +635,7 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
   }, [entityFilter]);
 
   useEffect(() => {
-    const currentList = snapshotList ?? sanctionsList;
+    const currentList = snapshotListRef.current ?? sanctionsList;
     if (!hasSearched || !query.trim() || currentList.length === 0) return;
     const list = entityFilter === "all" ? currentList : currentList.filter(e => e.type === entityFilter);
     const timer = setTimeout(() => { setResults(screenName(query.trim(), list, weights)); setExpanded(null); }, 300);
@@ -637,7 +643,7 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
   }, [weights]);
 
   const runScreen = () => {
-    const currentList = snapshotList ?? sanctionsList;
+    const currentList = snapshotListRef.current ?? sanctionsList;
     const list = entityFilter === "all" ? currentList : currentList.filter(e => e.type === entityFilter);
     if (!query.trim() || list.length === 0) return;
     setResults(screenName(query.trim(), list, weights));
@@ -726,7 +732,7 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
           <span style={{ fontSize: 12, color: "#9ca3af", alignSelf: "center", marginRight: 2 }}>Try:</span>
           {EXAMPLES.map(name => (
             <button key={name} onClick={() => {
-              const currentList = snapshotList ?? sanctionsList;
+              const currentList = snapshotListRef.current ?? sanctionsList;
               const list = entityFilter === "all" ? currentList : currentList.filter(e => e.type === entityFilter);
               setQuery(name);
               setResults(screenName(name, list, weights));
@@ -813,14 +819,14 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
                   setSelectedSnapshot(val);
                   setHasSearched(false); setResults([]);
                   if (val === "latest") {
-                    setSnapshotList(null);
+                    setSnapshotListAndRef(null);
                   } else {
                     setSnapshotLoading(true);
                     fetch("/.netlify/functions/sanctions?snapshot_id=" + val + "&_=" + Date.now())
                       .then(r => r.json())
                       .then(data => {
                         const entries = data.entries || data;
-                        setSnapshotList(Array.isArray(entries) ? entries : null);
+                        setSnapshotListAndRef(Array.isArray(entries) ? entries : null);
                         setSnapshotLoading(false);
                       })
                       .catch(() => setSnapshotLoading(false));
