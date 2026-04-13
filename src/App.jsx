@@ -894,18 +894,6 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
               {topScore >= 90 && <span style={{ marginLeft: 14, color: "#dc2626", fontWeight: 600 }}>⚠ Possible match found</span>}
               {topScore < 70 && grouped.length > 0 && <span style={{ marginLeft: 14, color: "#16a34a", fontWeight: 500 }}>✓ No strong hits</span>}
             </div>
-            {filtered.some(r => r.scores.combined >= 50) && (
-              <button onClick={runAiAnalysis} disabled={aiLoading} style={{
-                padding: "9px 18px", background: aiLoading ? "#f3f4f6" : "#1e3a5f",
-                color: aiLoading ? "#9ca3af" : "#fff",
-                border: "1.5px solid " + (aiLoading ? "#e5e7eb" : "#1e3a5f"),
-                borderRadius: 8, fontSize: 13, fontWeight: 600,
-                cursor: aiLoading ? "not-allowed" : "pointer",
-                fontFamily: "inherit", display: "flex", alignItems: "center", gap: 8
-              }}>
-                {aiLoading ? <><Spinner size={13} color="#6b7280" /> Analyzing...</> : "+ AI Assessment"}
-              </button>
-            )}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
@@ -1028,15 +1016,13 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
             })}
           </div>
           {aiAnalysis && (
-            <div style={{ background: "#fff", border: "1.5px solid #bfdbfe", borderRadius: 10, padding: "22px 24px", animation: "fadeIn 0.3s ease" }}>
+            <div style={{ background: "#fff", border: "1.5px solid #bfdbfe", borderRadius: 10, padding: "22px 24px", marginTop: 16, animation: "fadeIn 0.3s ease" }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#1e3a5f", marginBottom: 12 }}>✦ AI Assessment — Infotrek AI</div>
               <div style={{ fontSize: 14, lineHeight: 1.8, color: "#374151", whiteSpace: "pre-wrap" }}>{aiAnalysis}</div>
             </div>
           )}
         </div>
       )}
-
-      {!hasSearched && (
         <div style={{ background: "#fff", borderRadius: 12, padding: "56px", textAlign: "center", border: "1px solid #e5e7eb" }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>🛡</div>
           <div style={{ fontSize: 16, fontWeight: 600, color: "#374151", marginBottom: 6 }}>Enter a name to screen</div>
