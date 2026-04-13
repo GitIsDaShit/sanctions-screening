@@ -41,7 +41,6 @@ DB_NAME     = "postgres"
 DB_USER     = "postgres.byfyjwhzixtgbwxhpbql"
 DB_PASSWORD = "Tamburin253314"
 
-OFAC_JSON   = "public/sanctions.json"
 EU_XML      = "eu_sanctions.xml"
 UN_XML      = "un_sanctions.xml"
 EU_URL      = "https://webgate.ec.europa.eu/fsd/fsf/public/files/xmlFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw"
@@ -64,8 +63,12 @@ def clean(val):
 
 def download_file(url, path):
     print(f"  Laddar ner {path}...")
+    import ssl
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req, timeout=60) as resp, open(path, "wb") as f:
+    with urllib.request.urlopen(req, timeout=60, context=ctx) as resp, open(path, "wb") as f:
         f.write(resp.read())
 
 def tag(n): return f"{{{NS_EU}}}{n}"
@@ -87,42 +90,97 @@ def fingerprint(e):
     }, sort_keys=True))
 
 # ── OFAC parser ───────────────────────────────────────────────────────────────
+OFAC_XML = "ofac_sdn.xml"
+OFAC_URL = "https://www.treasury.gov/ofac/downloads/sdn.xml"
+
 def load_ofac_entries():
-    print(f"Läser {OFAC_JSON}...")
-    with open(OFAC_JSON, encoding="utf-8") as f:
-        data = json.load(f)
-    entries = data.get("entries", data)
-    source_date_str = data.get("meta", {}).get("source_date")
+    download_file(OFAC_URL, OFAC_XML)
+    print(f"Parsar {OFAC_XML}...")
+    tree = etree.parse(OFAC_XML)
+    root = tree.getroot()
+
+    # Hantera namespace
+    ns = root.tag.split("}")[0].strip("{") if "}" in root.tag else ""
+    def tag(n): return f"{{{ns}}}{n}" if ns else n
+
+    # Publiceringsdatum
+    pub_date = root.get("Publshdate", root.get("publshdate", ""))
     try:
-        source_date = datetime.fromisoformat(source_date_str).date() if source_date_str else datetime.now(timezone.utc).date()
+        source_date = datetime.strptime(pub_date, "%m/%d/%Y").date() if pub_date else datetime.now(timezone.utc).date()
     except Exception:
         source_date = datetime.now(timezone.utc).date()
 
     result = {}
-    for e in entries:
-        cid = str(e.get("id", "")).strip()
-        name = e.get("name", "").strip()
-        if not cid or not name:
-            continue
+    for el in root.findall(f".//{tag('sdnEntry')}"):
+        uid = clean(el.findtext(tag("uid")) or "")
+        if not uid: continue
+
+        last  = clean(el.findtext(tag("lastName"))  or "")
+        first = clean(el.findtext(tag("firstName")) or "")
+        if not last: continue
+        name = (first + " " + last).strip() if first else last
+
+        sdn_type = clean(el.findtext(tag("sdnType")) or "")
+        etype = {"Individual": "individual", "Entity": "organization",
+                 "Vessel": "vessel", "Aircraft": "aircraft"}.get(sdn_type, "unknown")
+
+        # Program
+        programs = [clean(p.text or "") for p in el.findall(f".//{tag('program')}") if p.text]
+        program = "; ".join(programs) if programs else None
+
+        # Aliases
+        aliases = []
+        for aka in el.findall(f".//{tag('aka')}"):
+            al = clean(aka.findtext(tag("lastName")) or "")
+            af = clean(aka.findtext(tag("firstName")) or "")
+            alias = (af + " " + al).strip() if af else al
+            if alias and alias != name: aliases.append(alias)
+
+        # DOB
+        dob = None
+        for dob_el in el.findall(f".//{tag('dateOfBirthItem')}"):
+            d = clean(dob_el.findtext(tag("dateOfBirth")) or "")
+            if d: dob = d; break
+
+        # Nationality
+        nationality = None
+        for nat_el in el.findall(f".//{tag('nationalityItem')}"):
+            c = clean(nat_el.findtext(tag("country")) or "")
+            if c: nationality = c; break
+
+        # Addresses
+        addresses = []
+        for addr_el in el.findall(f".//{tag('address')}"):
+            parts = [
+                clean(addr_el.findtext(tag("address1")) or ""),
+                clean(addr_el.findtext(tag("address2")) or ""),
+                clean(addr_el.findtext(tag("address3")) or ""),
+                clean(addr_el.findtext(tag("city"))     or ""),
+                clean(addr_el.findtext(tag("country"))  or ""),
+            ]
+            full = ", ".join(p for p in parts if p)
+            if full: addresses.append(full)
+
+        # Documents (passports, IDs)
+        documents = []
+        for id_el in el.findall(f".//{tag('id')}"):
+            id_type = clean(id_el.findtext(tag("idType")) or "").lower()
+            id_num  = clean(id_el.findtext(tag("idNumber")) or "")
+            id_country = clean(id_el.findtext(tag("idCountry")) or "") or ""
+            if not id_num: continue
+            dtype = "passport" if "passport" in id_type else "national_id"
+            documents.append({"type": dtype, "number": id_num, "country": id_country})
+
         entry = {
-            "id":          cid,
-            "name":        name,
-            "type":        e.get("type", "unknown"),
-            "program":     e.get("program"),
-            "gender":      e.get("gender"),
-            "dob":         e.get("dob"),
-            "pob":         e.get("pob"),
-            "nationality": e.get("nationality"),
-            "aliases":     [a for a in e.get("aliases", []) if a],
-            "addresses":   [a for a in e.get("addresses", []) if a],
-            "documents":   [{"type": "passport",    "number": p.get("number"), "country": p.get("country") or ""} for p in e.get("passports", []) if p.get("number")]
-                         + [{"type": "national_id", "number": n.get("number"), "country": n.get("country") or ""} for n in e.get("national_ids", []) if n.get("number")],
+            "id": uid, "name": name, "type": etype, "program": program,
+            "gender": None, "dob": dob, "pob": None, "nationality": nationality,
+            "aliases": aliases, "addresses": addresses, "documents": documents,
         }
         entry["_fingerprint"] = fingerprint(entry)
-        result[cid] = entry
+        result[uid] = entry
 
     print(f"  {len(result)} entiteter (listdatum: {source_date})")
-    return result, source_date, "https://www.treasury.gov/ofac/downloads/sdn.csv"
+    return result, source_date, OFAC_URL
 
 # ── EU parser ─────────────────────────────────────────────────────────────────
 def load_eu_entries():
