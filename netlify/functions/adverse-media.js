@@ -12,15 +12,23 @@ export default async (req) => {
     const articles = [];
     const seen = new Set();
 
-    // NewsAPI — sök på namn
+    // NewsAPI — sök på namn, försök med och utan citattecken
     if (NEWS_API_KEY) {
       try {
-        const newsRes = await fetch(
-          `https://newsapi.org/v2/everything?q=${encodeURIComponent('"' + query + '"')}&sortBy=relevancy&pageSize=20&language=en`,
-          { headers: { "X-Api-Key": NEWS_API_KEY } }
-        );
-        const newsData = await newsRes.json();
-        console.log("NewsAPI status:", newsData.status, "total:", newsData.totalResults, "error:", newsData.message);
+        // Försök med citattecken för exakt matchning
+        let newsUrl = `https://newsapi.org/v2/everything?q=${encodeURIComponent('"' + query + '"')}&sortBy=relevancy&pageSize=20&language=en`;
+        let newsRes = await fetch(newsUrl, { headers: { "X-Api-Key": NEWS_API_KEY } });
+        let newsData = await newsRes.json();
+        console.log("NewsAPI (quoted) status:", newsData.status, "total:", newsData.totalResults);
+
+        // Om inga träffar — försök utan citattecken
+        if (!newsData.articles?.length || newsData.totalResults === 0) {
+          newsUrl = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&sortBy=relevancy&pageSize=20&language=en`;
+          newsRes = await fetch(newsUrl, { headers: { "X-Api-Key": NEWS_API_KEY } });
+          newsData = await newsRes.json();
+          console.log("NewsAPI (unquoted) status:", newsData.status, "total:", newsData.totalResults);
+        }
+
         if (newsData.articles) {
           for (const a of newsData.articles) {
             if (!a.title || a.title === "[Removed]" || seen.has(a.url)) continue;
