@@ -216,7 +216,7 @@ def load_ofac_entries():
         entry = {
             "id": uid, "name": name, "type": etype, "program": program,
             "gender": None, "dob": dob, "pob": None, "nationality": nationality,
-            "aliases": add_transliterations(aliases, name), "addresses": addresses, "documents": documents,
+            "aliases": aliases, "addresses": addresses, "documents": documents,
         }
         entry["_fingerprint"] = fingerprint(entry)
         result[uid] = entry
@@ -305,7 +305,7 @@ def load_eu_entries():
 
         entry = {"id": cid, "name": primary_name, "type": etype, "program": program,
                  "gender": gender, "dob": dob_str, "pob": pob_str, "nationality": nat_str,
-                 "aliases": add_transliterations(aliases, primary_name), "addresses": addresses, "documents": documents}
+                 "aliases": aliases, "addresses": addresses, "documents": documents}
         entry["_fingerprint"] = fingerprint(entry)
         result[cid] = entry
 
@@ -366,7 +366,7 @@ def load_un_entries():
 
         entry = {"id": cid, "name": name, "type": "individual", "program": program,
                  "gender": None, "dob": dob_str, "pob": pob_str, "nationality": nat_str,
-                 "aliases": add_transliterations(aliases, name), "addresses": addresses, "documents": documents}
+                 "aliases": aliases, "addresses": addresses, "documents": documents}
         entry["_fingerprint"] = fingerprint(entry)
         result[cid] = entry
 
@@ -386,7 +386,7 @@ def load_un_entries():
 
         entry = {"id": cid, "name": name, "type": "organization", "program": program,
                  "gender": None, "dob": None, "pob": None, "nationality": None,
-                 "aliases": add_transliterations(aliases, name), "addresses": addresses, "documents": []}
+                 "aliases": aliases, "addresses": addresses, "documents": []}
         entry["_fingerprint"] = fingerprint(entry)
         result[cid] = entry
 

@@ -154,27 +154,52 @@ function scoreMatch(query, candidate, weights) {
     metaphone: Math.round(mph * 100), combined: Math.round(combined * 100),
   };
 }
-function isCJK(str) {
-  return /[\u3000-\u9fff\uac00-\ud7af\uf900-\ufaff]/.test(str);
+function isNonLatin(str) {
+  return /[\u0600-\u06ff\u0750-\u077f\u0400-\u04ff\u0370-\u03ff\u0590-\u05ff\u0900-\u097f\u3000-\u9fff\uac00-\ud7af\uf900-\ufaff]/.test(str);
+}
+
+// Enkel arabisk/persisk translitterering
+const ARABIC_MAP = {
+  'ا':'a','أ':'a','إ':'i','آ':'a','ب':'b','ت':'t','ث':'th','ج':'j','ح':'h','خ':'kh',
+  'د':'d','ذ':'dh','ر':'r','ز':'z','س':'s','ش':'sh','ص':'s','ض':'d','ط':'t','ظ':'z',
+  'ع':'a','غ':'gh','ف':'f','ق':'q','ك':'k','ل':'l','م':'m','ن':'n','ه':'h','و':'w',
+  'ی':'y','ي':'y','ة':'h','ء':'','ئ':'y','ؤ':'w','ى':'a','ع':'',
+  'فتح':'fath','الله':'allah','جمیری':'jomeiri',
+};
+
+function transliterateArabic(str) {
+  return str.split('').map(c => ARABIC_MAP[c] ?? c).join('').replace(/\s+/g, ' ').trim();
 }
 
 function screenName(query, list, weights) {
   const results = [];
-  const queryIsCJK = isCJK(query);
+  const queryIsNonLatin = isNonLatin(query);
   const qLower = query.toLowerCase();
+  
+  // För icke-latinska söktermer — translitterera och sök på båda
+  const translitQuery = queryIsNonLatin ? transliterateArabic(query) : null;
 
   for (const entry of list) {
     const namesToCheck = [entry.name, ...(entry.aliases || [])];
     let best = null, bestName = "";
 
-    if (queryIsCJK) {
-      // Exakt matchning för CJK-tecken
+    if (queryIsNonLatin) {
+      // Exakt matchning på original
       for (const n of namesToCheck) {
         if (!n) continue;
-        const score = n.includes(query) ? 100 : n.toLowerCase().includes(qLower) ? 90 : 0;
-        if (score > 0 && (!best || score > best.combined)) {
-          best = { combined: score, jaroWinkler: score, tokenSort: score, levenshtein: score, ngram: score, metaphone: score };
-          bestName = n;
+        if (n.includes(query) || n.toLowerCase().includes(qLower)) {
+          const score = n === query ? 100 : 90;
+          if (!best || score > best.combined) {
+            best = { combined: score, jaroWinkler: score, tokenSort: score, levenshtein: score, ngram: score, metaphone: score };
+            bestName = n;
+          }
+        }
+      }
+      // Fuzzy matchning på translittererad version
+      if (translitQuery && translitQuery.length > 2) {
+        for (const n of namesToCheck) {
+          const s = scoreMatch(translitQuery, n, weights);
+          if (!best || s.combined > best.combined) { best = s; bestName = n; }
         }
       }
     } else {
