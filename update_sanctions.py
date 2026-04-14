@@ -19,6 +19,48 @@ import sys, uuid, hashlib, json, time, argparse, urllib.request
 from datetime import datetime, timezone
 
 try:
+    from anyascii import anyascii
+except ImportError:
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "anyascii"])
+    from anyascii import anyascii
+
+def is_non_latin(s):
+    if not s: return False
+    return any('\u0370' <= c <= '\u03ff' or  # Greek
+               '\u0400' <= c <= '\u04ff' or  # Cyrillic
+               '\u0590' <= c <= '\u05ff' or  # Hebrew
+               '\u0600' <= c <= '\u06ff' or  # Arabic/Persian
+               '\u0900' <= c <= '\u097f' or  # Devanagari
+               '\u3000' <= c <= '\u9fff' or  # CJK
+               '\uac00' <= c <= '\ud7af'     # Korean
+               for c in s)
+
+def transliterate_alias(name):
+    """Returnerar translittererat namn om det innehåller icke-latinska tecken, annars None."""
+    if not name or not is_non_latin(name): return None
+    t = anyascii(name).strip()
+    if t and t != name and len(t) > 1: return t
+    return None
+
+def add_transliterations(aliases, primary_name):
+    """Lägger till translittererade versioner av icke-latinska namn."""
+    result = list(aliases)
+    seen = {n.lower() for n in result}
+    # Translitterera primary_name om icke-latinskt
+    t = transliterate_alias(primary_name)
+    if t and t.lower() not in seen:
+        result.append(t)
+        seen.add(t.lower())
+    # Translitterera alias
+    for alias in list(aliases):
+        t = transliterate_alias(alias)
+        if t and t.lower() not in seen:
+            result.append(t)
+            seen.add(t.lower())
+    return result
+
+try:
     import psycopg2
     from psycopg2.extras import execute_values
 except ImportError:
@@ -174,7 +216,7 @@ def load_ofac_entries():
         entry = {
             "id": uid, "name": name, "type": etype, "program": program,
             "gender": None, "dob": dob, "pob": None, "nationality": nationality,
-            "aliases": aliases, "addresses": addresses, "documents": documents,
+            "aliases": add_transliterations(aliases, name), "addresses": addresses, "documents": documents,
         }
         entry["_fingerprint"] = fingerprint(entry)
         result[uid] = entry
@@ -263,7 +305,7 @@ def load_eu_entries():
 
         entry = {"id": cid, "name": primary_name, "type": etype, "program": program,
                  "gender": gender, "dob": dob_str, "pob": pob_str, "nationality": nat_str,
-                 "aliases": aliases, "addresses": addresses, "documents": documents}
+                 "aliases": add_transliterations(aliases, primary_name), "addresses": addresses, "documents": documents}
         entry["_fingerprint"] = fingerprint(entry)
         result[cid] = entry
 
@@ -324,7 +366,7 @@ def load_un_entries():
 
         entry = {"id": cid, "name": name, "type": "individual", "program": program,
                  "gender": None, "dob": dob_str, "pob": pob_str, "nationality": nat_str,
-                 "aliases": aliases, "addresses": addresses, "documents": documents}
+                 "aliases": add_transliterations(aliases, name), "addresses": addresses, "documents": documents}
         entry["_fingerprint"] = fingerprint(entry)
         result[cid] = entry
 
@@ -344,7 +386,7 @@ def load_un_entries():
 
         entry = {"id": cid, "name": name, "type": "organization", "program": program,
                  "gender": None, "dob": None, "pob": None, "nationality": None,
-                 "aliases": aliases, "addresses": addresses, "documents": []}
+                 "aliases": add_transliterations(aliases, name), "addresses": addresses, "documents": []}
         entry["_fingerprint"] = fingerprint(entry)
         result[cid] = entry
 
