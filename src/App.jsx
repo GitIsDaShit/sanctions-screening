@@ -154,16 +154,37 @@ function scoreMatch(query, candidate, weights) {
     metaphone: Math.round(mph * 100), combined: Math.round(combined * 100),
   };
 }
+function isCJK(str) {
+  return /[\u3000-\u9fff\uac00-\ud7af\uf900-\ufaff]/.test(str);
+}
+
 function screenName(query, list, weights) {
   const results = [];
+  const queryIsCJK = isCJK(query);
+  const qLower = query.toLowerCase();
+
   for (const entry of list) {
     const namesToCheck = [entry.name, ...(entry.aliases || [])];
     let best = null, bestName = "";
-    for (const n of namesToCheck) {
-      const s = scoreMatch(query, n, weights);
-      if (!best || s.combined > best.combined) { best = s; bestName = n; }
+
+    if (queryIsCJK) {
+      // Exakt matchning för CJK-tecken
+      for (const n of namesToCheck) {
+        if (!n) continue;
+        const score = n.includes(query) ? 100 : n.toLowerCase().includes(qLower) ? 90 : 0;
+        if (score > 0 && (!best || score > best.combined)) {
+          best = { combined: score, jaroWinkler: score, tokenSort: score, levenshtein: score, ngram: score, metaphone: score };
+          bestName = n;
+        }
+      }
+    } else {
+      for (const n of namesToCheck) {
+        const s = scoreMatch(query, n, weights);
+        if (!best || s.combined > best.combined) { best = s; bestName = n; }
+      }
     }
-    results.push({ ...entry, scores: best, matchedName: bestName });
+
+    if (best) results.push({ ...entry, scores: best, matchedName: bestName });
   }
   return results.sort((a, b) => b.scores.combined - a.scores.combined);
 }
