@@ -619,6 +619,16 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
   const activeList = snapshotList ?? sanctionsList;
   const filteredList = entityFilter === "all" ? activeList : activeList.filter(e => e.type === entityFilter);
 
+  // Kör om screeningen automatiskt när snapshotList laddats klart
+  useEffect(() => {
+    if (!hasSearched || !query.trim()) return;
+    const currentList = snapshotListRef.current ?? sanctionsList;
+    if (currentList.length === 0) return;
+    const list = entityFilter === "all" ? currentList : currentList.filter(e => e.type === entityFilter);
+    setResults(screenName(query.trim(), list, weights));
+    setExpanded(null);
+  }, [snapshotList]);
+
   useEffect(() => {
     fetch("/.netlify/functions/sanctions?action=snapshots&_=" + Date.now())
       .then(r => r.json())
@@ -721,11 +731,11 @@ function SanctionsScreening({ sanctionsList, listLoading, listError, reloadList,
           <input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && runScreen()}
             placeholder="Enter name to screen..."
             style={{ flex: 1, padding: "11px 14px", fontSize: 15, border: "1.5px solid #d1d5db", borderRadius: 8, color: "#111827", background: "#fff", fontFamily: "inherit" }} />
-          <button onClick={runScreen} disabled={listLoading} style={{
-            padding: "11px 24px", background: listLoading ? "#9ca3af" : "#1e3a5f", color: "#fff",
+          <button onClick={runScreen} disabled={listLoading || snapshotLoading} style={{
+            padding: "11px 24px", background: (listLoading || snapshotLoading) ? "#9ca3af" : "#1e3a5f", color: "#fff",
             border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600,
-            cursor: listLoading ? "not-allowed" : "pointer", fontFamily: "inherit"
-          }}>Screen</button>
+            cursor: (listLoading || snapshotLoading) ? "not-allowed" : "pointer", fontFamily: "inherit"
+          }}>{snapshotLoading ? "Loading..." : "Screen"}</button>
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
